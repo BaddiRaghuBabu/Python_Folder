@@ -1,0 +1,61 @@
+from __future__ import annotations
+
+"""
+Helpers to build aggregate_data.csv from the per-mini-pipeline summaries.
+
+Typical flow:
+
+  1. build_aggregate_base_with_saleitemsmop()
+        -> creates aggregate_data.csv with:
+               date, ticketoffice_notes, saleitemsmop_total
+
+  2. build_membership_other_total_columns()
+        -> adds:
+               mddto_evergreen_other, mddto_evergreen_total
+
+  3. build_membership_miles_gross_column()
+        -> adds:
+               mddto_miles_gross
+
+  4. build_membership_misc_group_gross_column()
+        -> adds:
+               mddto_misc_group_gross
+
+  5. build_membership_waiting_list_gross_column()
+        -> adds:
+               mddto_waiting_list
+
+  6. build_membership_total_all_sales_gross_column()
+        -> adds:
+               mddto_total_all_sales
+
+  7. build_klarna_dailytakings_data_columns()
+        -> adds:
+               k_dailytakings_cash,
+               k_dailytakings_credit,
+               k_dailytakings_debit,
+               k_dailytakings_voucher,
+               k_dailytakings_account
+"""
+
+from .saleitemsmop_total_amount_aggregate import (
+    build_aggregate_base_with_saleitemsmop,
+)
+from .membership_other_total_aggregate import (
+    build_membership_other_total_columns,
+)
+from .membership_miles_gross_aggregete import (
+    build_membership_miles_gross_column,
+)
+from .membership_misc_group_gross_aggregete import (
+    build_membership_misc_group_gross_column,
+)
+from .membership_waiting_list_gross_aggregete import (
+    build_membership_waiting_list_gross_column,
+)
+from .membership_total_all_sales_gross_aggregete import (
+    build_membership_total_all_sales_gross_column,
+)
+from .k_dailytakings_data_aggregate import (
+    build_klarna_dailytakings_data_columns,
+)
