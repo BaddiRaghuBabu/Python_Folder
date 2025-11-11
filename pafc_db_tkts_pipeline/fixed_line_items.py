@@ -46,6 +46,7 @@ from .output import (
     write_membership_csv,              # Membership CSV (date, other, totals, etc.)
 )
 
+from .total_postel_charges import write_charges_postal_detail_excels
 
 # =====================================================================
 # saleitemsmop mini-pipeline
@@ -161,15 +162,17 @@ def run_ticketoffice_pipeline() -> int:
 
 def _stage2_build_charges_rows(
     files: list[Path],
-) -> tuple[list[dict[str, str]], list[str]]:
+) -> tuple[list[dict[str, str]], list[str], list[Path]]:
     rows: list[dict[str, str]] = []
     errors: list[str] = []
+    successful_paths: list[Path] = []
 
     for path in files:
         try:
             iso_date = extract_charges_date(path)
             ensure_charges_filename(path, iso_date)
             rows.append({"date": iso_date})
+            successful_paths.append(path)
         except Exception as exc:  # noqa: BLE001
             msg = f"{path.name}: {exc}"
             errors.append(msg)
@@ -185,8 +188,7 @@ def _stage2_build_charges_rows(
             "Charges Stage 2 PASS – header dates verified and rows built."
         )
 
-    return rows, errors
-
+    return rows, errors, successful_paths
 
 def run_charges_pipeline() -> int:
     log.info("Charges Daily Banking pipeline starting..")
@@ -194,8 +196,15 @@ def run_charges_pipeline() -> int:
         excels = stage1_discover_charges_excels()
     except Exception:  # noqa: BLE001
         return -1
+    _, postal_errors = write_charges_postal_detail_excels(successful_paths)
+    if postal_errors:
+        log.error(
+            "Charges pipeline aborted – Postal Charge detail creation FAILED; "
+            "CSV not created."
+        )
+        return -1
 
-    rows, errors = _stage2_build_charges_rows(excels)
+    rows, errors, successful_paths = _stage2_build_charges_rows(excels)
     if errors or not rows:
         log.error("Charges pipeline aborted – Stage 2 FAILED; CSV not created.")
         return -1

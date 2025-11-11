@@ -36,9 +36,11 @@ OUTPUT_DIR = TKTS_ROOT / "outputs"
 SALEITEMSMOP_EXCEL = OUTPUT_DIR / "saleitemsmop_summary.xlsx"
 TICKETOFFICE_CSV = OUTPUT_DIR / "ticketoffice_dailybanking_notes.csv"
 CHARGES_CSV = OUTPUT_DIR / "charges_summary.csv"
+CHARGES_POSTAL_OUTPUT_DIR = OUTPUT_DIR / "charges_all_postel"
 KLARNA_CSV = OUTPUT_DIR / "klarna_dailytakings_summary.csv"
 KLARNA_SEMOP_CSV = OUTPUT_DIR / "klarna_seasoneventmop_summary.csv"
 MEMBERSHIP_CSV = OUTPUT_DIR / "membershipdailydetailedtotals_summary.csv"
+
 
 # Temp CSV for Miles Away Travel Club gross value (legacy – still used by the
 # existing miles aggregate helper)
