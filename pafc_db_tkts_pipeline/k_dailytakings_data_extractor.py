@@ -118,7 +118,7 @@ def extract_klarna_dailytakings_mops(pdf_path: Path) -> dict[str, str]:
             amount = _last_amount_on_line(ln)
             if amount is None:
                 # Very defensive – normally all are on the same line
-                log.error(
+                log.debug(
                     "Klarna MoP extractor – could not parse amount on "
                     "line for '%s' in %s: %r",
                     label,
@@ -131,7 +131,7 @@ def extract_klarna_dailytakings_mops(pdf_path: Path) -> dict[str, str]:
             break
         else:
             # label not found in sale block → treat as error
-            log.error(
+            log.debug(
                 "Klarna MoP extractor – '%s' row not found in %s; "
                 "setting %s to 'Data Unavailable'.",
                 label,

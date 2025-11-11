@@ -80,13 +80,13 @@ def extract_mddto_misc_group_gross(pdf_path: Path) -> str:
                 return "Data Unavailable"
 
         if not misc_page_found:
-            log.error(
+            log.debug(
                 "Misc Group gross – no page containing both 'Misc Group' and "
                 "'Gross Value (Inc Charges)' in %s.",
                 pdf_path.name,
             )
         else:
-            log.error(
+            log.debug(
                 "Misc Group gross – Misc page found but gross value not extracted "
                 "in %s.",
                 pdf_path.name,

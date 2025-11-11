@@ -99,7 +99,7 @@ def extract_mddto_waiting_list_gross(pdf_path: Path | str) -> str:
                     return norm
 
         # If we reach here, we didn't find it anywhere
-        log.error(
+        log.debug(
             "Waiting List gross – could not locate '%s' on any page of %s",
             target_label,
             pdf_path.name,

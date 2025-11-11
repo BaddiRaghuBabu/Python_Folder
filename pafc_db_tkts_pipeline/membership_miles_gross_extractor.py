@@ -79,7 +79,7 @@ def extract_mddto_miles_gross(pdf_path: Path) -> str:
                         amount = m.group(0)
                         return amount
 
-                log.error(
+                log.debug(
                     "Miles gross – label found but no money value nearby in %s (page %d).",
                     pdf_path.name,
                     page_no,
@@ -87,13 +87,13 @@ def extract_mddto_miles_gross(pdf_path: Path) -> str:
                 return "Data Unavailable"
 
         if not miles_page_found:
-            log.error(
+            log.debug(
                 "Miles gross – no page containing both 'Miles Away Travel Club' and "
                 "'Gross Value (Inc Charges)' in %s.",
                 pdf_path.name,
             )
         else:
-            log.error(
+            log.debug(
                 "Miles gross – Miles page found but gross value not extracted in %s.",
                 pdf_path.name,
             )
