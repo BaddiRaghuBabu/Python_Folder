@@ -196,6 +196,12 @@ def run_charges_pipeline() -> int:
         excels = stage1_discover_charges_excels()
     except Exception:  # noqa: BLE001
         return -1
+    
+    rows, errors, successful_paths = _stage2_build_charges_rows(excels)
+    if errors or not rows:
+        log.error("Charges pipeline aborted – Stage 2 FAILED; CSV not created.")
+        return -1
+    
     _, postal_errors = write_charges_postal_detail_excels(successful_paths)
     if postal_errors:
         log.error(
@@ -204,10 +210,6 @@ def run_charges_pipeline() -> int:
         )
         return -1
 
-    rows, errors, successful_paths = _stage2_build_charges_rows(excels)
-    if errors or not rows:
-        log.error("Charges pipeline aborted – Stage 2 FAILED; CSV not created.")
-        return -1
 
     write_charges_csv(rows)
     log.info("Charges pipeline finished with %d record(s).", len(rows))
