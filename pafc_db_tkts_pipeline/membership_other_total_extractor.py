@@ -5,8 +5,7 @@ import re
 
 import pdfplumber
 
-from .logger import log  # you can keep this, but we won't log errors here
-
+from .logger import log  # only used for ERROR-level logging
 
 # Match money values like:
 #   78.00
@@ -77,78 +76,87 @@ def extract_membership_other_and_total(
     """
     pdf_path = Path(pdf_path)
 
-    with pdfplumber.open(pdf_path) as pdf:
-        page = pdf.pages[0]
-        full_text = page.extract_text() or ""
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            page = pdf.pages[0]
+            full_text = page.extract_text() or ""
 
-        # 1) Check if this looks like the Evergreen / MoP layout.
-        must_have = ("Evergreen", "Method of Payment", "Value Sold")
-        missing = [word for word in must_have if word not in full_text]
-        if missing:
-            # Layout is different – quietly return fallback values.
+            # 1) Check if this looks like the Evergreen / MoP layout.
+            must_have = ("Evergreen", "Method of Payment", "Value Sold")
+            missing = [word for word in must_have if word not in full_text]
+            if missing:
+                # Layout is different – quietly return fallback values.
+                return "Data Not Available In File", "Data Not Available In File"
+
+            words = page.extract_words()
+
+        # 2) Build visual lines and turn them into plain text strings
+        word_lines = _words_to_lines(words)
+        line_texts: list[str] = [
+            " ".join(w["text"] for w in line) for line in word_lines
+        ]
+
+        # 3) Find the Method-of-Payment block (start index)
+        start_idx: int | None = None
+        for i, text in enumerate(line_texts):
+            if "Method of Payment" in text:
+                start_idx = i
+                break
+
+        if start_idx is None:
+            # No MoP block – treat as no data, but not an error
             return "Data Not Available In File", "Data Not Available In File"
 
-        words = page.extract_words()
+        # 4) Find where the Membership Type section begins (stop index)
+        stop_idx = len(line_texts)
+        for i in range(start_idx + 1, len(line_texts)):
+            if "Membership Type" in line_texts[i]:
+                stop_idx = i
+                break
 
-    # 2) Build visual lines and turn them into plain text strings
-    word_lines = _words_to_lines(words)
-    line_texts: list[str] = [
-        " ".join(w["text"] for w in line) for line in word_lines
-    ]
+        mop_lines = line_texts[start_idx:stop_idx]
 
-    # 3) Find the Method-of-Payment block (start index)
-    start_idx: int | None = None
-    for i, text in enumerate(line_texts):
-        if "Method of Payment" in text:
-            start_idx = i
-            break
+        other_val: str | None = None
+        total_val: str | None = None
 
-    if start_idx is None:
-        # No MoP block – treat as no data
+        for text in mop_lines:
+            lower = text.lower()
+
+            # Skip headers
+            if "method of payment" in lower or "no sold value sold" in lower:
+                continue
+
+            tokens = lower.split()
+            is_other = "other" in tokens
+            is_total = "total" in tokens
+
+            if not (is_other or is_total):
+                continue
+
+            # Find all money values on the line; take the last one as Value Sold
+            amounts = _MONEY_RE.findall(text)
+            if not amounts:
+                continue
+
+            value = amounts[-1]
+
+            if is_other and other_val is None:
+                other_val = value
+            if is_total and total_val is None:
+                total_val = value
+
+        # 5) Apply fallbacks so we NEVER raise, and NEVER return None
+        if other_val is None:
+            other_val = "Data Not Available In File"
+        if total_val is None:
+            total_val = "Data Not Available In File"
+
+        return other_val, total_val
+
+    except Exception as exc:  # noqa: BLE001
+        log.error(
+            "Membership Other/Total – unexpected error while parsing %s: %s",
+            pdf_path.name,
+            exc,
+        )
         return "Data Not Available In File", "Data Not Available In File"
-
-    # 4) Find where the Membership Type section begins (stop index)
-    stop_idx = len(line_texts)
-    for i in range(start_idx + 1, len(line_texts)):
-        if "Membership Type" in line_texts[i]:
-            stop_idx = i
-            break
-
-    mop_lines = line_texts[start_idx:stop_idx]
-
-    other_val: str | None = None
-    total_val: str | None = None
-
-    for text in mop_lines:
-        lower = text.lower()
-
-        # Skip headers
-        if "method of payment" in lower or "no sold value sold" in lower:
-            continue
-
-        tokens = lower.split()
-        is_other = "other" in tokens
-        is_total = "total" in tokens
-
-        if not (is_other or is_total):
-            continue
-
-        # Find all money values on the line; take the last one as Value Sold
-        amounts = _MONEY_RE.findall(text)
-        if not amounts:
-            continue
-
-        value = amounts[-1]
-
-        if is_other and other_val is None:
-            other_val = value
-        if is_total and total_val is None:
-            total_val = value
-
-    # 5) Apply fallbacks so we NEVER raise, and NEVER return None
-    if other_val is None:
-        other_val = "Data Not Available In File"
-    if total_val is None:
-        total_val = "Data Not Available In File"
-
-    return other_val, total_val

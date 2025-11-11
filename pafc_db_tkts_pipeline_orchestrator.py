@@ -24,6 +24,8 @@ Stage 5 – this orchestrator + aggregate builder
 """
 
 import sys
+from typing import Callable
+
 
 from pafc_db_tkts_pipeline.logger import log
 from pafc_db_tkts_pipeline.fixed_line_items import (
@@ -49,61 +51,20 @@ def main() -> None:
     """Run all mini-pipelines in order and exit with proper status code."""
     log.info("PAFC DB TKTS master pipeline starting.")
 
-    results: dict[str, int] = {}
+    results: list[tuple[str, int]] = []
 
-    # 1. TicketOffice
-    ticketoffice_count = run_ticketoffice_pipeline()
-    if ticketoffice_count < 0:
-        log.error(
-            "Stage 5 – ERROR – pipeline aborted because TicketOffice mini-pipeline FAILED."
-        )
-        sys.exit(1)
-    results["TicketOffice"] = ticketoffice_count
+    stage_runners: list[tuple[str, Callable[[], int]]] = [
+        ("TicketOffice", run_ticketoffice_pipeline),
+        ("saleitemsmop", run_saleitemsmop_pipeline),
+        ("Charges", run_charges_pipeline),
+        ("Klarna DailyTakings", run_klarna_pipeline),
+        ("Klarna SeasonEvent MoP", run_klarna_seasoneventmop_pipeline),
+        ("Membership Daily Detailed Totals", run_membership_pipeline),
+    ]
 
-    # 2. saleitemsmop
-    sale_count = run_saleitemsmop_pipeline()
-    if sale_count < 0:
-        log.error(
-            "Stage 5 – ERROR – pipeline aborted because saleitemsmop mini-pipeline FAILED."
-        )
-        sys.exit(1)
-    results["saleitemsmop"] = sale_count
-
-    # 3. Charges
-    charges_count = run_charges_pipeline()
-    if charges_count < 0:
-        log.error(
-            "Stage 5 – ERROR – pipeline aborted because Charges mini-pipeline FAILED."
-        )
-        sys.exit(1)
-    results["Charges"] = charges_count
-
-    # 4. Klarna DailyTakings
-    klarna_count = run_klarna_pipeline()
-    if klarna_count < 0:
-        log.error(
-            "Stage 5 – ERROR – pipeline aborted because Klarna DailyTakings mini-pipeline FAILED."
-        )
-        sys.exit(1)
-    results["Klarna DailyTakings"] = klarna_count
-
-    # 5. Klarna SeasonEvent MoP
-    semop_count = run_klarna_seasoneventmop_pipeline()
-    if semop_count < 0:
-        log.error(
-            "Stage 5 – ERROR – pipeline aborted because Klarna SeasonEvent MoP mini-pipeline FAILED."
-        )
-        sys.exit(1)
-    results["Klarna SeasonEvent MoP"] = semop_count
-
-    # 6. Membership
-    membership_count = run_membership_pipeline()
-    if membership_count < 0:
-        log.error(
-            "Stage 5 – ERROR – pipeline aborted because Membership mini-pipeline FAILED."
-        )
-        sys.exit(1)
-    results["Membership Daily Detailed Totals"] = membership_count
+    for step_index, (name, runner) in enumerate(stage_runners, start=1):
+        count = _run_stage(step_index, name, runner)
+        results.append((name, count))
 
     # Build aggregate_data.csv
     build_aggregate_base_with_saleitemsmop()
@@ -119,8 +80,37 @@ def main() -> None:
         "Stage 5 – Completed Pipeline – all mini-pipelines and aggregate_data.csv "
         "finished successfully."
     )
-    for name, count in results.items():
-        log.info("  • %s pipeline finished with %d record(s).", name, count)
+
+    _log_summary(results)
+
+
+def _run_stage(step_index: int, name: str, runner: Callable[[], int]) -> int:
+    """Execute a mini-pipeline with consistent, expressive logging."""
+
+    prefix = f"Stage 5 – Step {step_index}"
+    log.info("%s – %s pipeline starting.", prefix, name)
+    count = runner()
+    if count < 0:
+        log.error(
+            "%s – ERROR – pipeline aborted because %s mini-pipeline FAILED.",
+            prefix,
+            name,
+        )
+        sys.exit(1)
+
+    log.info("%s – %s pipeline finished with %d record(s).", prefix, name, count)
+    return count
+
+
+def _log_summary(results: list[tuple[str, int]]) -> None:
+    """Print a clean, aligned summary of all stage results."""
+
+    name_width = max((len(name) for name, _ in results), default=0)
+    log.info("Stage 5 – Summary of processed mini-pipelines:")
+    for name, count in results:
+        padded_name = name.ljust(name_width)
+        log.info("  • %s | %4d record(s)", padded_name, count)
+
 
 
 if __name__ == "__main__":

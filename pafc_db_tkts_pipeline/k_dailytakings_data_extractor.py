@@ -107,14 +107,6 @@ def extract_klarna_dailytakings_mops(pdf_path: Path) -> dict[str, str]:
 
     sale_block = lines[sale_start_idx:sale_end_idx]
 
-    # Debug logging of the block we scan
-    log.info(
-        "Klarna MoP extractor – scanning 'Sale Payments' block in %s",
-        pdf_path.name,
-    )
-    for i, ln in enumerate(sale_block, start=1):
-        log.info("  [K-MOP %03d] %s", i, ln)
-
     # Look for each label in this block
     for label, out_col in target_labels.items():
         pattern = re.compile(rf"^{re.escape(label)}\b", flags=re.IGNORECASE)
@@ -136,21 +128,16 @@ def extract_klarna_dailytakings_mops(pdf_path: Path) -> dict[str, str]:
                 result[out_col] = "Data Unavailable"
             else:
                 result[out_col] = amount
-                log.info(
-                    "Klarna MoP extractor – %s -> %s (%s).",
-                    label,
-                    amount,
-                    pdf_path.name,
-                )
             break
         else:
-            # label not found in sale block
-            log.warning(
+            # label not found in sale block → treat as error
+            log.error(
                 "Klarna MoP extractor – '%s' row not found in %s; "
                 "setting %s to 'Data Unavailable'.",
                 label,
                 pdf_path.name,
                 out_col,
             )
+            result[out_col] = "Data Unavailable"
 
     return result

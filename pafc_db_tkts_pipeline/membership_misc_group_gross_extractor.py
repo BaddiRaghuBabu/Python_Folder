@@ -11,28 +11,6 @@ from .logger import log
 _MONEY_RE = re.compile(r"\d[\d,]*\.\d{2}")
 
 
-def _log_misc_page_block(pdf_name: str, page_no: int, lines: list[str]) -> None:
-    """
-    Debug helper – log all lines from the 'Misc Group' line
-    downwards so we can see exactly what text was read from the PDF.
-    """
-    start_idx = 0
-    for i, line in enumerate(lines):
-        if "Misc Group" in line:
-            start_idx = i
-            break
-
-    block = lines[start_idx:]
-
-    log.info(
-        "Misc Group debug – page %d of %s – lines from 'Misc Group' down:",
-        page_no,
-        pdf_name,
-    )
-    for idx, text in enumerate(block, start=1):
-        log.info("  [Misc %03d] %s", idx, text)
-
-
 def extract_mddto_misc_group_gross(pdf_path: Path) -> str:
     """
     Extract the 'Gross Value (Inc Charges)' amount for the Misc Group section.
@@ -44,7 +22,6 @@ def extract_mddto_misc_group_gross(pdf_path: Path) -> str:
           - 'Misc Group'
           - 'Gross Value (Inc Charges)'
     * On that page:
-          - Log all lines from 'Misc Group' downward (for debugging).
           - Find the line containing 'Gross Value (Inc Charges)'.
           - Search that line and the next 3 lines for a money value.
           - Return the FIRST money value found (e.g. '216.00').
@@ -72,10 +49,7 @@ def extract_mddto_misc_group_gross(pdf_path: Path) -> str:
 
                 lines = [ln.strip() for ln in text.splitlines() if ln.strip()]
 
-                # Log whole Misc block
-                _log_misc_page_block(pdf_path.name, page_no, lines)
-
-                gross_idx = None
+                gross_idx: int | None = None
                 for i, line in enumerate(lines):
                     if "Gross Value (Inc Charges)" in line:
                         gross_idx = i
@@ -95,14 +69,6 @@ def extract_mddto_misc_group_gross(pdf_path: Path) -> str:
                     m = _MONEY_RE.search(lines[j])
                     if m:
                         amount = m.group(0)
-                        log.info(
-                            "Misc Group gross – extracted '%s' from line %d on "
-                            "page %d of %s.",
-                            amount,
-                            j + 1,
-                            page_no,
-                            pdf_path.name,
-                        )
                         return amount
 
                 log.error(
