@@ -40,6 +40,7 @@ CHARGES_POSTAL_OUTPUT_DIR = OUTPUT_DIR / "charges_all_postel"
 CHARGES_TOTALS_OUTPUT_DIR = OUTPUT_DIR / "all_values"
 KLARNA_CSV = OUTPUT_DIR / "klarna_dailytakings_summary.csv"
 KLARNA_SEMOP_CSV = OUTPUT_DIR / "klarna_seasoneventmop_summary.csv"
+KLARNA_SEMOP_TABLE_OUTPUT_DIR = OUTPUT_DIR / "season_events"
 MEMBERSHIP_CSV = OUTPUT_DIR / "membershipdailydetailedtotals_summary.csv"
 
 

@@ -46,6 +46,7 @@ from .output import (
     write_membership_csv,              # Membership CSV (date, other, totals, etc.)
 )
 
+from .klarna_seasonevent import export_klarna_seasonevent_tables
 from .total_postel_charges import write_charges_postal_detail_excels
 from .extract_totals_from_file import write_charges_totals_excels
 
@@ -315,14 +316,19 @@ def run_klarna_pipeline() -> int:
 
 def _stage2_build_klarna_seasoneventmop_rows(
     pdfs: list[Path],
-) -> tuple[list[dict[str, str]], list[str]]:
+) -> tuple[list[dict[str, str]], list[str], list[Path]]:    
     rows: list[dict[str, str]] = []
     errors: list[str] = []
+    processed_paths: list[Path] = []
 
     for path in pdfs:
         try:
             iso_date = extract_klarna_seasoneventmop_date(path)
             ensure_klarna_seasoneventmop_filename(path, iso_date)
+            expected_path = path.with_name(
+                f"klarna_seasoneventmop_{iso_date}{path.suffix.lower()}"
+            )
+            processed_paths.append(expected_path if expected_path.exists() else path)
             rows.append({"date": iso_date})
         except Exception as exc:  # noqa: BLE001
             msg = f"{path.name}: {exc}"
@@ -340,8 +346,7 @@ def _stage2_build_klarna_seasoneventmop_rows(
             "rows built."
         )
 
-    return rows, errors
-
+    return rows, errors, processed_paths
 
 def run_klarna_seasoneventmop_pipeline() -> int:
     log.info("Klarna SeasonEvent MoP pipeline starting..")
@@ -350,14 +355,14 @@ def run_klarna_seasoneventmop_pipeline() -> int:
     except Exception:  # noqa: BLE001
         return -1
 
-    rows, errors = _stage2_build_klarna_seasoneventmop_rows(pdfs)
+    rows, errors, processed_paths = _stage2_build_klarna_seasoneventmop_rows(pdfs)    
     if errors or not rows:
         log.error(
             "Klarna SeasonEvent MoP pipeline aborted – Stage 2 FAILED; "
             "CSV not created."
         )
         return -1
-
+    export_klarna_seasonevent_tables(processed_paths)
     write_klarna_seasoneventmop_csv(rows)
     log.info(
         "Klarna SeasonEvent MoP pipeline finished with %d record(s).",

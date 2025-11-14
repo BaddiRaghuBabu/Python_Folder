@@ -57,9 +57,9 @@ def main() -> None:
         ("TicketOffice", run_ticketoffice_pipeline),
         ("saleitemsmop", run_saleitemsmop_pipeline),
         ("Charges", run_charges_pipeline),
+        ("Membership Daily Detailed Totals", run_membership_pipeline),
         ("Klarna DailyTakings", run_klarna_pipeline),
         ("Klarna SeasonEvent MoP", run_klarna_seasoneventmop_pipeline),
-        ("Membership Daily Detailed Totals", run_membership_pipeline),
     ]
 
     for step_index, (name, runner) in enumerate(stage_runners, start=1):
