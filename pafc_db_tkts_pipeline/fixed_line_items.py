@@ -47,8 +47,8 @@ from .output import (
 )
 
 from .klarna_seasonevent import export_klarna_seasonevent_tables
-from .total_postel_charges import write_charges_postal_detail_excels
-from .extract_totals_from_file import write_charges_totals_excels
+from .charges_total_postel_charges import write_charges_postal_detail_excels
+from .charges_totals_from_file import write_charges_totals_excels
 
 
 # =====================================================================

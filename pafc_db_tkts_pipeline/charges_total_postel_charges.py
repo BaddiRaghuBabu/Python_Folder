@@ -184,7 +184,7 @@ def write_postal_detail_excel(path: Path, output_dir: Path) -> bool:
     df_out = pd.DataFrame(data_rows, columns=["date", "Charge Type", "Value"])
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"charges_postel{date_str}.xlsx"
+    out_path = output_dir / f"charges_postel_{date_str}.xlsx"
     sheet_name = f"charges_{date_str}"
 
     try:

@@ -117,7 +117,7 @@ def _process_pdf(pdf_file: Path) -> bool:
 
         combined_df = pd.concat(cleaned_tables, ignore_index=True)
         _ensure_output_dir()
-        out_file = KLARNA_SEMOP_TABLE_OUTPUT_DIR / f"{pdf_file.stem}_final.csv"
+        out_file = KLARNA_SEMOP_TABLE_OUTPUT_DIR / f"{pdf_file.stem}.csv"
         combined_df.to_csv(out_file, index=False)
         log.info("Saved Klarna Season/Event MoP CSV: %s", out_file)
         return True
