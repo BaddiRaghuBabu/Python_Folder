@@ -178,7 +178,7 @@ def write_postal_detail_excel(path: Path, output_dir: Path) -> bool:
     ]
 
     data_rows.append(
-        {"date": date_str, "Charge Type": "TOTAL", "Value": f"{total:.2f}"}
+        {"date": date_str, "Charge Type": "Total Charges Postal", "Value": f"{total:.2f}"}
     )
 
     df_out = pd.DataFrame(data_rows, columns=["date", "Charge Type", "Value"])

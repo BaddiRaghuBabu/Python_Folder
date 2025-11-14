@@ -1,250 +1,184 @@
-from __future__ import annotations
+# from __future__ import annotations
 
-from pathlib import Path
-import logging
-import re
+# from pathlib import Path
+# import re
+# import math
+# from typing import List, Dict, Optional
 
-import pandas as pd
-
-
-# ---------------------------------------------------------------------------
-# Simple logger (ERROR only)
-# ---------------------------------------------------------------------------
-
-log = logging.getLogger("charges_postal")
-if not log.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(
-        logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-    )
-    log.addHandler(handler)
-log.setLevel(logging.ERROR)
+# import pandas as pd
 
 
-POSTAL_LABEL = "Postal Charge"
+# # -------------------------------------------------------------
+# # CONFIG – your folders
+# # -------------------------------------------------------------
+# INPUT_DIR = Path(
+#     r"C:\Users\RaghuBaddi\OneDrive - Valuenode Private Limited\RB VD SHARE\TKTS\Inputs\charges_YYYYMMDD"
+# )
+# OUTPUT_DIR = Path(
+#     r"C:\Users\RaghuBaddi\OneDrive - Valuenode Private Limited\RB VD SHARE\TKTS\outputs\all_values"
+# )
+# OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# TOTAL_PREFIX = "Total "
 
 
-def _parse_float(value: str, file_name: str, row_idx: int) -> float | None:
-    """Normalise '8.50', '1,700.00', '(2.00)' -> float; log only on error."""
-    if value is None:
-        return None
-
-    s = str(value).strip()
-    if not s:
-        return None
-
-    negative = s.startswith("(") and s.endswith(")")
-    s = s.strip("()").replace(",", "")
-
-    try:
-        num = float(s)
-    except ValueError:
-        log.error(
-            "Charges postal – cannot parse Value '%s' in %s (row %s).",
-            value,
-            file_name,
-            row_idx,
-        )
-        return None
-
-    if negative:
-        num = -num
-    return num
+# def extract_date_from_filename(filename: str) -> Optional[str]:
+#     """
+#     Extract YYYYMMDD from filenames like 'charges_20250408.xls' -> '20250408'.
+#     """
+#     m = re.search(r"(\d{8})", filename)
+#     if not m:
+#         return None
+#     yyyymmdd = m.group(1)
+#     return yyyymmdd   # <- no hyphens, exactly what you asked
 
 
-def _get_income_block(df: pd.DataFrame, file_name: str) -> pd.DataFrame | None:
-    """Return rows between first INCOME and first 'Total INCOME' (inclusive)."""
-    df = df.fillna("")
+# def parse_float(value) -> Optional[float]:
+#     """
+#     Convert cell value to float, skipping blanks/NaN.
+#     Handles: 8, 8.50, '1,700.00', '(2.00)'.
+#     """
+#     if isinstance(value, float) and math.isnan(value):
+#         return None
 
-    income_mask = df.apply(
-        lambda row: row.astype(str)
-        .str.contains(r"\bINCOME\b", case=False, regex=True)
-        .any(),
-        axis=1,
-    )
-    income_indices = [i for i, v in income_mask.items() if v]
-    if not income_indices:
-        log.error("Charges postal – 'INCOME' not found in %s.", file_name)
-        return None
-    start_idx = income_indices[0]
+#     if value is None:
+#         return None
 
-    total_income_mask = df.apply(
-        lambda row: row.astype(str)
-        .str.contains("Total INCOME", case=False)
-        .any(),
-        axis=1,
-    )
-    total_indices = [i for i, v in total_income_mask.items() if v and i >= start_idx]
-    if not total_indices:
-        log.error("Charges postal – 'Total INCOME' not found in %s.", file_name)
-        return None
-    stop_idx = total_indices[0]
+#     if isinstance(value, (int, float)):
+#         return float(value)
 
-    return df.iloc[start_idx : stop_idx + 1].copy()
+#     s = str(value).strip()
+#     if not s or s.lower() == "nan":
+#         return None
 
+#     negative = s.startswith("(") and s.endswith(")")
+#     s = s.strip("()").replace(",", "")
 
-def _locate_header(work: pd.DataFrame, file_name: str) -> tuple[int, int, int] | None:
-    """Return (header_row_index, charge_col_index, value_col_index)."""
-    header_row_idx = None
-    header_row = None
-    for idx in work.index:
-        row = work.loc[idx].astype(str)
-        if any(cell.strip() == "Charge Type" for cell in row) and any(
-            cell.strip() == "Value" for cell in row
-        ):
-            header_row_idx = idx
-            header_row = row
-            break
+#     try:
+#         num = float(s)
+#     except ValueError:
+#         return None
 
-    if header_row_idx is None:
-        log.error(
-            "Charges postal – header row with 'Charge Type'/'Value' not found in %s.",
-            file_name,
-        )
-        return None
+#     if negative:
+#         num = -num
 
-    charge_col = None
-    value_col = None
-    for col_idx, cell in header_row.items():
-        txt = str(cell).strip()
-        if txt == "Charge Type":
-            charge_col = col_idx
-        elif txt == "Value":  # ignore 'Retained Value'
-            value_col = col_idx
-
-    if charge_col is None or value_col is None:
-        log.error(
-            "Charges postal – could not locate 'Charge Type' or 'Value' columns in %s.",
-            file_name,
-        )
-        return None
-
-    return header_row_idx, charge_col, value_col
+#     return num
 
 
-def extract_postal_rows(path: Path) -> list[dict[str, str]]:
-    """
-    Return list of rows like:
-        {"charge_type": "...", "value": "8.50", "row_index": "23"}
-    for all Postal Charge lines in INCOME block.
-    """
-    path = Path(path)
+# def extract_totals_from_file(path: Path) -> List[Dict[str, object]]:
+#     """
+#     Read one charges_YYYYMMDD.xls and return all totals inside INCOME sections:
 
-    try:
-        df = pd.read_excel(
-            path,
-            header=None,
-            dtype=str,
-            engine="xlrd",  # needed for .xls
-        )
-    except Exception as exc:  # noqa: BLE001
-        log.error("Charges postal – failed to read %s: %s", path.name, exc)
-        return []
+#       - any row where some cell starts with 'Total '
+#       - for that row, take the **2nd numeric value** as the 'Value'
+#         (1st = Number of Charges, 2nd = Value)
+#       - skip rows under 'Method of Payment' and 'NON INCOME'
+#     """
+#     print(f"Extracting totals from: {path.name}")
+#     df = pd.read_excel(path, header=None)
 
-    block = _get_income_block(df, path.name)
-    if block is None:
-        return []
+#     results: List[Dict[str, object]] = []
+#     inside_income = False
+#     date_str = extract_date_from_filename(path.name)
 
-    header_info = _locate_header(block, path.name)
-    if header_info is None:
-        return []
+#     for _, row in df.iterrows():
+#         row_list = list(row)
 
-    header_row_idx, charge_col, value_col = header_info
+#         # Normalised text for each cell
+#         texts = []
+#         for v in row_list:
+#             if isinstance(v, float) and math.isnan(v):
+#                 texts.append("")
+#             elif v is None:
+#                 texts.append("")
+#             else:
+#                 texts.append(str(v).strip())
 
-    results: list[dict[str, str]] = []
+#         # Turn INCOME mode on/off
+#         if any(t == "INCOME" for t in texts):
+#             inside_income = True
+#             continue
 
-    for idx in block.index:
-        if idx <= header_row_idx:
-            continue
+#         if any(t == "Method of Payment" for t in texts) or any(
+#             t == "NON INCOME" for t in texts
+#         ):
+#             inside_income = False
+#             continue
 
-        charge_text = str(block.at[idx, charge_col]).strip()
-        if POSTAL_LABEL.lower() not in charge_text.lower():
-            continue
+#         if not inside_income:
+#             continue
 
-        value_text = str(block.at[idx, value_col]).strip()
-        if not value_text:
-            continue
+#         # Find a cell that starts with 'Total '
+#         total_name = None
+#         for t in texts:
+#             if t.startswith(TOTAL_PREFIX):
+#                 total_name = t
+#                 break
 
-        results.append(
-            {
-                "charge_type": charge_text,
-                "value": value_text,
-                "row_index": str(idx),
-            }
-        )
+#         if not total_name:
+#             continue
 
-    return results
+#         # Collect all numeric values in that row (skip NaN/blanks)
+#         numeric_vals: List[float] = []
+#         for cell in row_list:
+#             num = parse_float(cell)
+#             if num is not None:
+#                 numeric_vals.append(num)
 
+#         # Decide which numeric is the 'Value'
+#         if not numeric_vals:
+#             value = None
+#         elif len(numeric_vals) >= 2:
+#             # 1st = Number of Charges, 2nd = Value
+#             value = numeric_vals[1]
+#         else:
+#             value = numeric_vals[0]
 
-def write_postal_detail_excel(path: Path, output_dir: Path) -> None:
-    """
-    For one charges_YYYYMMDD.xls:
-      - collect all Postal Charge rows in INCOME block
-      - compute total
-      - write charges_postal_detail_YYYYMMDD.xlsx in output_dir
-      Columns: date, Charge Type, Value.
-      Sheet name: charges_YYYYMMDD
-    """
-    path = Path(path)
-    rows = extract_postal_rows(path)
+#         results.append(
+#             {
+#                 "date": date_str,       # <-- YYYYMMDD
+#                 "file": path.name,      # internal, we will drop later
+#                 "total_name": total_name,
+#                 "value": value,
+#             }
+#         )
 
-    # Extract date from filename
-    m = re.search(r"(\d{8})", path.name)
-    date_str = m.group(1) if m else path.stem
-
-    total = 0.0
-    for r in rows:
-        num = _parse_float(r["value"], path.name, int(r["row_index"]))
-        if num is None:
-            continue
-        total += num
-
-    # Detail rows with date as first column
-    data_rows = [
-        {
-            "date": date_str,
-            "Charge Type": r["charge_type"],
-            "Value": r["value"],
-        }
-        for r in rows
-    ]
-
-    # Total row
-    data_rows.append(
-        {
-            "date": date_str,
-            "Charge Type": "TOTAL",
-            "Value": f"{total:.2f}",
-        }
-    )
-
-    df_out = pd.DataFrame(data_rows)
-
-    out_path = output_dir / f"charges_postal_detail_{date_str}.xlsx"
-    sheet_name = f"charges_{date_str}"
-
-    try:
-        output_dir.mkdir(parents=True, exist_ok=True)
-        with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
-            df_out.to_excel(writer, index=False, sheet_name=sheet_name)
-    except Exception as exc:  # noqa: BLE001
-        log.error(
-            "Charges postal – failed to write detail Excel %s: %s",
-            out_path,
-            exc,
-        )
+#     return results
 
 
-def process_all_charges_files(input_dir: Path, output_dir: Path) -> None:
-    for xls_path in sorted(input_dir.glob("charges_*.xls")):
-        write_postal_detail_excel(xls_path, output_dir)
+# def main() -> None:
+#     all_rows: List[Dict[str, object]] = []
+
+#     for file in sorted(INPUT_DIR.glob("*.xls")):
+#         rows = extract_totals_from_file(file)
+#         if not rows:
+#             continue
+
+#         all_rows.extend(rows)
+
+#         # ---- per-file output: charges_value_YYYYMMDD.xlsx ----
+#         df_file = pd.DataFrame(rows)
+#         df_file = df_file[["date", "total_name", "value"]]  # remove 'file'
+#         date_str = rows[0]["date"] or "unknown"
+#         per_file_out = OUTPUT_DIR / f"charges_value_{date_str}.xlsx"
+#         df_file.to_excel(per_file_out, index=False)
+#         print(f"  wrote per-file summary: {per_file_out.name}")
+
+#     if not all_rows:
+#         print("No totals detected in any file.")
+#         return
+
+#     # ---- combined output for all dates (optional, nice summary) ----
+#     out_df = pd.DataFrame(all_rows)
+#     out_df = out_df[["date", "total_name", "value"]]  # drop 'file'
+#     combined_out = OUTPUT_DIR / "charges_totals_all_dates.xlsx"
+#     out_df.to_excel(combined_out, index=False)
+
+#     print("=========================================")
+#     print(f"✔ Total rows written: {len(out_df)}")
+#     print(f"➡ Combined file: {combined_out.name}")
+#     print("=========================================")
 
 
-if __name__ == "__main__":
-    INPUT_DIR = Path(
-        r"C:\Users\RaghuBaddi\OneDrive - Valuenode Private Limited\RB VD SHARE\TKTS\Inputs\charges_YYYYMMDD"
-    )
-    OUTPUT_DIR = Path(
-        r"C:\Users\RaghuBaddi\OneDrive - Valuenode Private Limited\RB VD SHARE\TKTS\outputs\charges_all_postel"
-    )
-    process_all_charges_files(INPUT_DIR, OUTPUT_DIR)  
+# if __name__ == "__main__":
+#     main()
