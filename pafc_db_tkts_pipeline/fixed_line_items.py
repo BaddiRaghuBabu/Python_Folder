@@ -47,6 +47,8 @@ from .output import (
 )
 
 from .total_postel_charges import write_charges_postal_detail_excels
+from .extract_totals_from_file import write_charges_totals_excels
+
 
 # =====================================================================
 # saleitemsmop mini-pipeline
@@ -210,6 +212,14 @@ def run_charges_pipeline() -> int:
         )
         return -1
 
+
+    totals_count, total_errors = write_charges_totals_excels(successful_paths)
+    if total_errors or totals_count == 0:
+        log.error(
+            "Charges pipeline aborted – Charges totals extraction FAILED; "
+            "Excel not created."
+        )
+        return -1
 
     write_charges_csv(rows)
     log.info("Charges pipeline finished with %d record(s).", len(rows))
