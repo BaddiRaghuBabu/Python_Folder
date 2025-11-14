@@ -157,17 +157,26 @@ def extract_postal_rows(path: Path) -> list[dict[str, str]]:
     return results
 
 
-def write_postal_detail_excel(path: Path, output_dir: Path) -> bool:
-    """Write one charges_postel<date>.xlsx workbook with detail rows and totals."""
+def _extract_date_from_path(path: Path) -> str:
 
-    rows = extract_postal_rows(path)
 
     match = re.search(r"(\d{8})", path.name)
-    date_str = match.group(1) if match else path.stem
+    return match.group(1) if match else path.stem
 
+def _build_postal_output_rows(
+    *,
+    rows: list[dict[str, str]],
+    date_str: str,
+    file_name: str,
+) -> list[dict[str, str]]:
     total = 0.0
     for row in rows:
-        number = _parse_float(row["value"], path.name, int(row["row_index"]))
+        try:
+            row_idx = int(row.get("row_index", -1))
+        except (TypeError, ValueError):
+            row_idx = -1
+
+        number = _parse_float(row.get("value"), file_name, row_idx)
         if number is None:
             continue
         total += number
@@ -181,10 +190,30 @@ def write_postal_detail_excel(path: Path, output_dir: Path) -> bool:
         {"date": date_str, "Charge Type": "Total Charges Postal", "Value": f"{total:.2f}"}
     )
 
+    return data_rows
+
+
+def write_postal_detail_excel(
+    path: Path,
+    output_dir: Path,
+    rows: list[dict[str, str]] | None = None,
+    data_rows: list[dict[str, str]] | None = None,
+) -> bool:
+    """Write one charges_postel_<date>.xlsx workbook with detail rows and totals."""
+
+    if rows is None:
+        rows = extract_postal_rows(path)
+
+    date_str = _extract_date_from_path(path)
+    if data_rows is None:
+        data_rows = _build_postal_output_rows(
+            rows=rows, date_str=date_str, file_name=path.name
+        )
+
     df_out = pd.DataFrame(data_rows, columns=["date", "Charge Type", "Value"])
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    out_path = output_dir / f"charges_postel{date_str}.xlsx"
+    out_path = output_dir / f"charges_postel_{date_str}.xlsx"
     sheet_name = f"charges_{date_str}"
 
     try:
@@ -207,17 +236,52 @@ def write_postal_detail_excel(path: Path, output_dir: Path) -> bool:
 
 
 def write_charges_postal_detail_excels(paths: Iterable[Path]) -> tuple[int, list[str]]:
-    """Create Postal Charge detail workbooks for every Charges Excel provided."""
+    """Create Postal Charge detail workbooks and a combined summary workbook."""
 
     successes = 0
     errors: list[str] = []
+    combined_rows: list[dict[str, str]] = []
+
 
     for path in paths:
-        result = write_postal_detail_excel(Path(path), CHARGES_POSTAL_OUTPUT_DIR)
+        current_path = Path(path)
+        rows = extract_postal_rows(current_path)
+        date_str = _extract_date_from_path(current_path)
+        data_rows = _build_postal_output_rows(
+            rows=rows, date_str=date_str, file_name=current_path.name
+        )
+
+        result = write_postal_detail_excel(
+            current_path,
+            CHARGES_POSTAL_OUTPUT_DIR,
+            rows=rows,
+            data_rows=data_rows,
+        )
         if result:
             successes += 1
+            combined_rows.extend(data_rows)
         else:
-            errors.append(Path(path).name)
+            errors.append(current_path.name)
+
+    if combined_rows:
+        CHARGES_POSTAL_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        combined_df = pd.DataFrame(combined_rows, columns=["date", "Charge Type", "Value"])
+        combined_df.sort_values(["date", "Charge Type"], inplace=True)
+        all_dates_path = CHARGES_POSTAL_OUTPUT_DIR / "charges_postel_all_dates.xlsx"
+        try:
+            combined_df.to_excel(all_dates_path, index=False)
+        except Exception as exc:  # noqa: BLE001
+            log.error(
+                "Charges postal – failed to write combined workbook %s: %s",
+                all_dates_path.name,
+                exc,
+            )
+        else:
+            log.info(
+                "Charges postal – combined workbook %s created with %d row(s).",
+                all_dates_path.name,
+                len(combined_df),
+            )
 
     if errors:
         log.error(
