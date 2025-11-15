@@ -21,6 +21,18 @@ _SKIP_EVENT_VALUES = {"total for the period"}
 _SKIP_TOTAL_NAME_VALUES = {"total income"}
 
 
+def _unique_preserve_order(values: list[str]) -> list[str]:
+    """Return values preserving first occurrence order while dropping duplicates."""
+
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
 def _clean_series(values: pd.Series) -> list[str]:
     cleaned: list[str] = []
     for value in values.dropna().astype(str):
@@ -65,8 +77,7 @@ def _collect_events() -> list[str]:
                 continue
             events.append(value)
 
-    return events
-
+    return _unique_preserve_order(events)
 
 def _collect_total_names() -> list[str]:
     totals_workbook = CHARGES_TOTALS_OUTPUT_DIR / _TOTALS_WORKBOOK
@@ -100,8 +111,7 @@ def _collect_total_names() -> list[str]:
             continue
         total_names.append(value)
 
-    return total_names
-
+    return _unique_preserve_order(total_names)
 
 def _write_report(events: list[str], total_names: list[str]) -> Path | None:
     if not events and not total_names:
