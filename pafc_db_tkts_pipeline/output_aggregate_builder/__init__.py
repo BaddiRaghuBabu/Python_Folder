@@ -36,6 +36,9 @@ Typical flow:
                k_dailytakings_debit,
                k_dailytakings_voucher,
                k_dailytakings_account
+  8. build_total_ticketing_income_column()
+        -> adds:
+            Total Ticketing Income
 """
 
 from .saleitemsmop_total_amount_aggregate import (
@@ -58,4 +61,7 @@ from .membership_total_all_sales_gross_aggregete import (
 )
 from .k_dailytakings_data_aggregate import (
     build_klarna_dailytakings_data_columns,
+)
+from .total_ticketing_income_data_aggregate import (
+    build_total_ticketing_income_column,
 )
