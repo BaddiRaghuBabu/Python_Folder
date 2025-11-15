@@ -38,6 +38,10 @@ TICKETOFFICE_CSV = OUTPUT_DIR / "ticketoffice_dailybanking_notes.csv"
 CHARGES_CSV = OUTPUT_DIR / "charges_summary.csv"
 CHARGES_POSTAL_OUTPUT_DIR = OUTPUT_DIR / "charges_all_postel"
 CHARGES_TOTALS_OUTPUT_DIR = OUTPUT_DIR / "charges_all_total_values"
+CHARGES_EVENT_TOTAL_REPORT_DIR = OUTPUT_DIR / "charges_event_total_report"
+CHARGES_EVENT_TOTAL_REPORT_XLSX = (
+    CHARGES_EVENT_TOTAL_REPORT_DIR / "charges_total_name_season_event.xlsx"
+)
 KLARNA_CSV = OUTPUT_DIR / "klarna_dailytakings_summary.csv"
 KLARNA_SEMOP_CSV = OUTPUT_DIR / "klarna_seasoneventmop_summary.csv"
 KLARNA_SEMOP_TABLE_OUTPUT_DIR = OUTPUT_DIR / "season_events"
