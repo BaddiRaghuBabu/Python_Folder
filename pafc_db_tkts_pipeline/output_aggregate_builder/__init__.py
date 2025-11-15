@@ -39,6 +39,9 @@ Typical flow:
   8. build_total_ticketing_income_column()
         -> adds:
             Total Ticketing Income
+  9. build_total_postal_charges_column()
+        -> adds:
+            Total Postal Charges
 """
 
 from .saleitemsmop_total_amount_aggregate import (
@@ -62,6 +65,9 @@ from .membership_total_all_sales_gross_aggregete import (
 from .k_dailytakings_data_aggregate import (
     build_klarna_dailytakings_data_columns,
 )
-from .total_ticketing_income_data_aggregate import (
+from .SeasonEvent_total_ticketing_income_data_aggregate import (
     build_total_ticketing_income_column,
+)
+from .SeasonEvent_total_postel_charges_data_aggregate import (
+    build_total_postal_charges_column,
 )
