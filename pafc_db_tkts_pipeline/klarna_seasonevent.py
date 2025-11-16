@@ -16,6 +16,12 @@ UNWANTED_KEYWORDS = {"date:", "time:", "page", "mop analysis", "xrreports"}
 RESERVED_TRAILING_HEADERS = ["Total", "VAT", "Total Ex. VAT"]
 CCDVA_COLUMNS = ["Cash", "Credit", "Debit", "Voucher", "Account"]
 
+def _extract_iso_date_from_name(pdf_file: Path) -> str:
+    match = re.search(r"(\d{8})", pdf_file.stem)
+    if not match:
+        raise ValueError(f"Could not determine date from filename: {pdf_file.name}")
+    return match.group(1)
+
 def _ensure_output_dir() -> None:
     KLARNA_SEMOP_TABLE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -113,6 +119,8 @@ def _prepare_ccdva_totals(df: pd.DataFrame) -> pd.DataFrame:
 def _process_pdf(pdf_file: Path) -> bool:
     log.info("Processing Klarna Season/Event MoP PDF: %s", pdf_file.name)
     try:
+        iso_date = _extract_iso_date_from_name(pdf_file)
+        month = iso_date[:6]
         tables = camelot.read_pdf(
             str(pdf_file),
             pages="all",
@@ -144,6 +152,8 @@ def _process_pdf(pdf_file: Path) -> bool:
                 != "total for the period"
             ]
 
+        combined_df.insert(0, "Month", month)
+        combined_df.insert(0, "Date", iso_date)
         combined_df = _prepare_ccdva_totals(combined_df)
         _ensure_output_dir()
         out_file = KLARNA_SEMOP_TABLE_OUTPUT_DIR / f"{pdf_file.stem}.csv"
