@@ -14,7 +14,7 @@ from .logger import log
 
 UNWANTED_KEYWORDS = {"date:", "time:", "page", "mop analysis", "xrreports"}
 RESERVED_TRAILING_HEADERS = ["Total", "VAT", "Total Ex. VAT"]
-
+CCDVA_COLUMNS = ["Cash", "Credit", "Debit", "Voucher", "Account"]
 
 def _ensure_output_dir() -> None:
     KLARNA_SEMOP_TABLE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -85,8 +85,30 @@ def set_event_column(df: pd.DataFrame) -> pd.DataFrame | None:
         df_data = df_data.iloc[:, : len(final_headers)]
 
     df_data.columns = pd.Index(final_headers, name=None)
+    df_data.columns = df_data.columns.map(
+        lambda col: col.strip() if isinstance(col, str) else col
+    )
     return df_data
 
+def _to_numeric(series: pd.Series) -> pd.Series:
+    cleaned = (
+        series.fillna("0")
+        .astype(str)
+        .str.replace(",", "", regex=False)
+        .str.strip()
+    )
+    return pd.to_numeric(cleaned, errors="coerce").fillna(0)
+
+
+def _prepare_ccdva_totals(df: pd.DataFrame) -> pd.DataFrame:
+    working_df = df.copy()
+    for column in CCDVA_COLUMNS:
+        if column not in working_df.columns:
+            working_df[column] = 0
+        working_df[column] = _to_numeric(working_df[column])
+
+    working_df["charges_CCDVA"] = working_df[CCDVA_COLUMNS].sum(axis=1)
+    return working_df
 
 def _process_pdf(pdf_file: Path) -> bool:
     log.info("Processing Klarna Season/Event MoP PDF: %s", pdf_file.name)
@@ -116,6 +138,13 @@ def _process_pdf(pdf_file: Path) -> bool:
             raise ValueError("No usable table data after cleaning")
 
         combined_df = pd.concat(cleaned_tables, ignore_index=True)
+        if "Event" in combined_df.columns:
+            combined_df = combined_df[
+                combined_df["Event"].astype(str).str.strip().str.lower()
+                != "total for the period"
+            ]
+
+        combined_df = _prepare_ccdva_totals(combined_df)
         _ensure_output_dir()
         out_file = KLARNA_SEMOP_TABLE_OUTPUT_DIR / f"{pdf_file.stem}.csv"
         combined_df.to_csv(out_file, index=False)
