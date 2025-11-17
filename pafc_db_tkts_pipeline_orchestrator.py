@@ -28,6 +28,8 @@ from typing import Callable
 
 
 from pafc_db_tkts_pipeline.logger import log
+from pafc_db_tkts_pipeline.checksums import run_all_stage1_checksums
+
 from pafc_db_tkts_pipeline.fixed_line_items import (
     run_ticketoffice_pipeline,
     run_saleitemsmop_pipeline,
@@ -57,16 +59,30 @@ from pafc_db_tkts_pipeline.charges_total_name_seanson_Event_name_ import (
 def main() -> None:
     """Run all mini-pipelines in order and exit with proper status code."""
     log.info("PAFC DB TKTS master pipeline starting.")
-
+    try:
+        stage1_results = run_all_stage1_checksums()
+    except Exception:
+        sys.exit(1)
     results: list[tuple[str, int]] = []
 
     stage_runners: list[tuple[str, Callable[[], int]]] = [
-        ("TicketOffice", run_ticketoffice_pipeline),
-        ("saleitemsmop", run_saleitemsmop_pipeline),
-        ("Charges", run_charges_pipeline),
-        ("Membership Daily Detailed Totals", run_membership_pipeline),
-        ("Klarna DailyTakings", run_klarna_pipeline),
-        ("Klarna SeasonEvent MoP", run_klarna_seasoneventmop_pipeline),
+(
+            "TicketOffice",
+            lambda: run_ticketoffice_pipeline(stage1_results.ticketoffice_excels),
+        ),
+        ("saleitemsmop", lambda: run_saleitemsmop_pipeline(stage1_results.saleitemsmop_pdfs)),
+        ("Charges", lambda: run_charges_pipeline(stage1_results.charges_excels)),
+        (
+            "Membership Daily Detailed Totals",
+            lambda: run_membership_pipeline(stage1_results.membership_pdfs),
+        ),
+        ("Klarna DailyTakings", lambda: run_klarna_pipeline(stage1_results.klarna_pdfs)),
+        (
+            "Klarna SeasonEvent MoP",
+            lambda: run_klarna_seasoneventmop_pipeline(
+                stage1_results.klarna_seasoneventmop_pdfs
+            ),
+        ),
     ]
 
     for step_index, (name, runner) in enumerate(stage_runners, start=1):

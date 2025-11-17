@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from dataclasses import dataclass
 
 from .config import (
     INPUT_DIR,
@@ -103,6 +104,48 @@ def stage1_discover_membership_pdfs() -> list[Path]:
 # ---------------------------------------------------------------------------
 # Filename enforcement helpers
 # ---------------------------------------------------------------------------
+
+@dataclass
+class Stage1Results:
+    """Aggregated results from running all Stage 1 folder checks."""
+
+    saleitemsmop_pdfs: list[Path]
+    ticketoffice_excels: list[Path]
+    charges_excels: list[Path]
+    klarna_pdfs: list[Path]
+    klarna_seasoneventmop_pdfs: list[Path]
+    membership_pdfs: list[Path]
+
+
+def run_all_stage1_checksums() -> Stage1Results:
+    """Validate every input folder in a single pass.
+
+    This ensures Stage 1 runs once for all folders instead of individually and
+    logs a clear completion message when every folder passes.
+    """
+
+    log.info("Stage 1 – Running checksums for all input folders together.")
+    try:
+        saleitemsmop_pdfs = stage1_discover_files()
+        ticketoffice_excels = stage1_discover_ticketoffice_excels()
+        charges_excels = stage1_discover_charges_excels()
+        klarna_pdfs = stage1_discover_klarna_pdfs()
+        klarna_seasoneventmop_pdfs = stage1_discover_klarna_seasoneventmop_pdfs()
+        membership_pdfs = stage1_discover_membership_pdfs()
+    except Exception:
+        log.error("Stage 1 – All folder checksums FAILED; see errors above.")
+        raise
+
+    log.info("Stage 1 – All folder checksums successfully completed.")
+    return Stage1Results(
+        saleitemsmop_pdfs=saleitemsmop_pdfs,
+        ticketoffice_excels=ticketoffice_excels,
+        charges_excels=charges_excels,
+        klarna_pdfs=klarna_pdfs,
+        klarna_seasoneventmop_pdfs=klarna_seasoneventmop_pdfs,
+        membership_pdfs=membership_pdfs,
+    )
+
 
 def ensure_saleitemsmop_filename(pdf_path: Path, iso_date: str) -> None:
     stem = pdf_path.stem

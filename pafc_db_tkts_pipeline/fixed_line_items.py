@@ -88,12 +88,15 @@ def _stage2_build_saleitemsmop_rows(
     return rows, errors
 
 
-def run_saleitemsmop_pipeline() -> int:
+def run_saleitemsmop_pipeline(pdfs: list[Path] | None = None) -> int:
     log.info("saleitemsmop pipeline starting..")
-    try:
-        pdfs = stage1_discover_files()
-    except Exception:  # noqa: BLE001
-        return -1
+    if pdfs is None:
+        try:
+            pdfs = stage1_discover_files()
+        except Exception:  # noqa: BLE001
+            return -1
+    else:
+        log.info("saleitemsmop Stage 1 – using prevalidated PDFs: %d", len(pdfs))
 
     rows, errors = _stage2_build_saleitemsmop_rows(pdfs)
     if errors or not rows:
@@ -142,12 +145,15 @@ def _stage2_build_ticketoffice_rows(
     return rows, errors
 
 
-def run_ticketoffice_pipeline() -> int:
+def run_ticketoffice_pipeline(excels: list[Path] | None = None) -> int:
     log.info("TicketOffice Daily Banking pipeline starting..")
-    try:
-        excels = stage1_discover_ticketoffice_excels()
-    except Exception:  # noqa: BLE001
-        return -1
+    if excels is None:
+        try:
+            excels = stage1_discover_ticketoffice_excels()
+        except Exception:  # noqa: BLE001
+            return -1
+    else:
+        log.info("TicketOffice Stage 1 – using prevalidated Excels: %d", len(excels))
 
     rows, errors = _stage2_build_ticketoffice_rows(excels)
     if errors or not rows:
@@ -196,12 +202,15 @@ def _stage2_build_charges_rows(
 
     return rows, errors, successful_paths
 
-def run_charges_pipeline() -> int:
+def run_charges_pipeline(excels: list[Path] | None = None) -> int:
     log.info("Charges Daily Banking pipeline starting..")
-    try:
-        excels = stage1_discover_charges_excels()
-    except Exception:  # noqa: BLE001
-        return -1
+    if excels is None:
+        try:
+            excels = stage1_discover_charges_excels()
+        except Exception:  # noqa: BLE001
+            return -1
+    else:
+        log.info("Charges Stage 1 – using prevalidated Excels: %d", len(excels))
     
     rows, errors, successful_paths = _stage2_build_charges_rows(excels)
     if errors or not rows:
@@ -295,12 +304,15 @@ def _stage2_build_klarna_rows(
     return rows, errors
 
 
-def run_klarna_pipeline() -> int:
+def run_klarna_pipeline(pdfs: list[Path] | None = None) -> int:
     log.info("Klarna DailyTakings pipeline starting..")
-    try:
-        pdfs = stage1_discover_klarna_pdfs()
-    except Exception:  # noqa: BLE001
-        return -1
+    if pdfs is None:
+        try:
+            pdfs = stage1_discover_klarna_pdfs()
+        except Exception:  # noqa: BLE001
+            return -1
+    else:
+        log.info("Klarna Stage 1 – using prevalidated PDFs: %d", len(pdfs))
 
     rows, errors = _stage2_build_klarna_rows(pdfs)
     if errors or not rows:
@@ -351,12 +363,15 @@ def _stage2_build_klarna_seasoneventmop_rows(
 
     return rows, errors, processed_paths
 
-def run_klarna_seasoneventmop_pipeline() -> int:
+def run_klarna_seasoneventmop_pipeline(pdfs: list[Path] | None = None) -> int:
     log.info("Klarna SeasonEvent MoP pipeline starting..")
-    try:
-        pdfs = stage1_discover_klarna_seasoneventmop_pdfs()
-    except Exception:  # noqa: BLE001
-        return -1
+    if pdfs is None:
+        try:
+            pdfs = stage1_discover_klarna_seasoneventmop_pdfs()
+        except Exception:  # noqa: BLE001
+            return -1
+    else:
+        log.info("Klarna SeasonEvent MoP Stage 1 – using prevalidated PDFs: %d", len(pdfs))
 
     rows, errors, processed_paths = _stage2_build_klarna_seasoneventmop_rows(pdfs)    
     if errors or not rows:
@@ -469,12 +484,15 @@ def _stage2_build_membership_rows(
     return rows, errors
 
 
-def run_membership_pipeline() -> int:
+def run_membership_pipeline(pdfs: list[Path] | None = None) -> int:
     log.info("Membership Daily Detailed Totals pipeline starting..")
-    try:
-        pdfs = stage1_discover_membership_pdfs()
-    except Exception:  # noqa: BLE001
-        return -1
+    if pdfs is None:
+        try:
+            pdfs = stage1_discover_membership_pdfs()
+        except Exception:  # noqa: BLE001
+            return -1
+    else:
+        log.info("Membership Stage 1 – using prevalidated PDFs: %d", len(pdfs))
 
     rows, errors = _stage2_build_membership_rows(pdfs)
     if errors or not rows:
