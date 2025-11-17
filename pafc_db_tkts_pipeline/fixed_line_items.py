@@ -46,7 +46,10 @@ from .output import (
     write_membership_csv,              # Membership CSV (date, other, totals, etc.)
 )
 
-from .klarna_seasonevent import export_klarna_seasonevent_tables
+from .klarna_seasonevent import (
+    build_monthly_unique_events_list,
+    export_klarna_seasonevent_tables,
+)
 from .charges_total_postel_charges import write_charges_postal_detail_excels
 from .charges_totals_from_file import write_charges_totals_excels
 
@@ -363,6 +366,7 @@ def run_klarna_seasoneventmop_pipeline() -> int:
         )
         return -1
     export_klarna_seasonevent_tables(processed_paths)
+    build_monthly_unique_events_list()
     write_klarna_seasoneventmop_csv(rows)
     log.info(
         "Klarna SeasonEvent MoP pipeline finished with %d record(s).",

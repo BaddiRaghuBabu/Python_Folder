@@ -45,6 +45,8 @@ CHARGES_EVENT_TOTAL_REPORT_XLSX = (
 KLARNA_CSV = OUTPUT_DIR / "klarna_dailytakings_summary.csv"
 KLARNA_SEMOP_CSV = OUTPUT_DIR / "klarna_seasoneventmop_summary.csv"
 KLARNA_SEMOP_TABLE_OUTPUT_DIR = OUTPUT_DIR / "season_events"
+MONTHLY_UNIQUE_EVENTS_DIR = OUTPUT_DIR / "monthly_unique_events_list"
+MONTHLY_UNIQUE_EVENTS_CSV = MONTHLY_UNIQUE_EVENTS_DIR / "monthly_unique_events_list.csv"
 MEMBERSHIP_CSV = OUTPUT_DIR / "membershipdailydetailedtotals_summary.csv"
 
 

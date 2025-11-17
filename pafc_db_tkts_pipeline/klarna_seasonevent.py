@@ -9,7 +9,12 @@ from typing import Iterable
 import camelot
 import pandas as pd
 
-from .config import KLARNA_SEMOP_INPUT_DIR, KLARNA_SEMOP_TABLE_OUTPUT_DIR
+from .config import (
+    KLARNA_SEMOP_INPUT_DIR,
+    KLARNA_SEMOP_TABLE_OUTPUT_DIR,
+    MONTHLY_UNIQUE_EVENTS_CSV,
+    MONTHLY_UNIQUE_EVENTS_DIR,
+)
 from .logger import log
 
 UNWANTED_KEYWORDS = {"date:", "time:", "page", "mop analysis", "xrreports"}
@@ -164,6 +169,55 @@ def _process_pdf(pdf_file: Path) -> bool:
     except Exception as exc:  # noqa: BLE001
         log.error("Failed processing %s – %s", pdf_file.name, exc)
         return False
+
+def build_monthly_unique_events_list() -> Path | None:
+    """Create a Month/Event listing from existing Season/Event CSV exports."""
+
+    csv_files = sorted(KLARNA_SEMOP_TABLE_OUTPUT_DIR.glob("*.csv"))
+    if not csv_files:
+        log.warning(
+            "No Klarna Season/Event MoP CSV files found in %s.",
+            KLARNA_SEMOP_TABLE_OUTPUT_DIR,
+        )
+        return None
+
+    monthly_events: list[pd.DataFrame] = []
+    for csv_file in csv_files:
+        try:
+            df = pd.read_csv(csv_file, dtype=str)
+        except Exception as exc:  # noqa: BLE001
+            log.error(
+                "Unable to read Season/Event CSV %s – %s", csv_file.name, exc
+            )
+            continue
+
+        if not {"Month", "Event"}.issubset(df.columns):
+            log.warning(
+                "Skipping %s because required columns are missing.", csv_file.name
+            )
+            continue
+
+        cleaned = df[["Month", "Event"]].dropna()
+        cleaned = cleaned.assign(
+            Month=cleaned["Month"].astype(str).str.strip(),
+            Event=cleaned["Event"].astype(str).str.strip(),
+        )
+        cleaned = cleaned[(cleaned["Month"] != "") & (cleaned["Event"] != "")]
+        if not cleaned.empty:
+            monthly_events.append(cleaned)
+
+    if not monthly_events:
+        log.warning("No Month/Event data available to build unique list.")
+        return None
+
+    combined = pd.concat(monthly_events, ignore_index=True)
+    combined = combined.drop_duplicates(subset=["Month", "Event"])
+    combined = combined.sort_values(["Month", "Event"], ignore_index=True)
+
+    MONTHLY_UNIQUE_EVENTS_DIR.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(MONTHLY_UNIQUE_EVENTS_CSV, index=False)
+    log.info("Saved monthly unique events list: %s", MONTHLY_UNIQUE_EVENTS_CSV)
+    return MONTHLY_UNIQUE_EVENTS_CSV
 
 
 def export_klarna_seasonevent_tables(
