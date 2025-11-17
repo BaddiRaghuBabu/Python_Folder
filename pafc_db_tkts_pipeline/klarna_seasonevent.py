@@ -118,7 +118,7 @@ def _prepare_ccdva_totals(df: pd.DataFrame) -> pd.DataFrame:
             working_df[column] = 0
         working_df[column] = _to_numeric(working_df[column])
 
-    working_df["charges_CCDVA"] = working_df[CCDVA_COLUMNS].sum(axis=1)
+    working_df["Total_CCDVA"] = working_df[CCDVA_COLUMNS].sum(axis=1)
     return working_df
 
 def _process_pdf(pdf_file: Path) -> bool:
