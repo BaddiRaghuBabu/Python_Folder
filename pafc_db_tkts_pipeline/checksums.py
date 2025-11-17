@@ -60,8 +60,7 @@ def _ensure_folder_has_only(folder: Path, allowed_suffixes: set[str]) -> list[Pa
         log.error(msg)
         raise ValueError(msg)
 
-    # Generic Stage 1 PASS message
-    log.info("Stage 1 – ALL CheckSums PASS to Stage 2")
+ 
     return files
 
 
@@ -124,7 +123,7 @@ def run_all_stage1_checksums() -> Stage1Results:
     logs a clear completion message when every folder passes.
     """
 
-    log.info("Stage 1 – Running checksums for all input folders together.")
+    log.info("Stage 1 – checksum verification in progress…")
     try:
         saleitemsmop_pdfs = stage1_discover_files()
         ticketoffice_excels = stage1_discover_ticketoffice_excels()
@@ -136,7 +135,10 @@ def run_all_stage1_checksums() -> Stage1Results:
         log.error("Stage 1 – All folder checksums FAILED; see errors above.")
         raise
 
-    log.info("Stage 1 – All folder checksums successfully completed.")
+    log.info(
+        "Stage 1 – all checksum validations completed successfully. "
+        "Proceeding to Stage 2."
+    )
     return Stage1Results(
         saleitemsmop_pdfs=saleitemsmop_pdfs,
         ticketoffice_excels=ticketoffice_excels,
