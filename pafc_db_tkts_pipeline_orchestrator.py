@@ -28,7 +28,7 @@ from typing import Callable
 
 
 from pafc_db_tkts_pipeline.logger import log
-from pafc_db_tkts_pipeline.checksums import run_all_stage1_checksums
+from pafc_db_tkts_pipeline.checksums import Stage1Results, run_all_stage1_checksums
 
 from pafc_db_tkts_pipeline.fixed_line_items import (
     run_ticketoffice_pipeline,
@@ -63,31 +63,8 @@ def main() -> None:
         stage1_results = run_all_stage1_checksums()
     except Exception:
         sys.exit(1)
-    results: list[tuple[str, int]] = []
 
-    stage_runners: list[tuple[str, Callable[[], int]]] = [
-(
-            "TicketOffice",
-            lambda: run_ticketoffice_pipeline(stage1_results.ticketoffice_excels),
-        ),
-        ("saleitemsmop", lambda: run_saleitemsmop_pipeline(stage1_results.saleitemsmop_pdfs)),
-        ("Charges", lambda: run_charges_pipeline(stage1_results.charges_excels)),
-        (
-            "Membership Daily Detailed Totals",
-            lambda: run_membership_pipeline(stage1_results.membership_pdfs),
-        ),
-        ("Klarna DailyTakings", lambda: run_klarna_pipeline(stage1_results.klarna_pdfs)),
-        (
-            "Klarna SeasonEvent MoP",
-            lambda: run_klarna_seasoneventmop_pipeline(
-                stage1_results.klarna_seasoneventmop_pdfs
-            ),
-        ),
-    ]
-
-    for step_index, (name, runner) in enumerate(stage_runners, start=1):
-        count = _run_stage(step_index, name, runner)
-        results.append((name, count))
+    results = run_stage2_pipelines(stage1_results)
 
     # Build aggregate_data.csv
     build_aggregate_base_with_saleitemsmop()
@@ -107,13 +84,44 @@ def main() -> None:
         "finished successfully."
     )
 
-    _log_summary(results)
+    _log_stage_summary("Stage 2", results)
 
 
-def _run_stage(step_index: int, name: str, runner: Callable[[], int]) -> int:
+def run_stage2_pipelines(stage1_results: Stage1Results) -> list[tuple[str, int]]:
+
+    """Execute all Stage 2 pipelines using prevalidated Stage 1 inputs."""
+    results: list[tuple[str, int]] = []
+
+    stage_runners: list[tuple[str, Callable[[], int]]] = [
+        (
+            "TicketOffice",
+            lambda: run_ticketoffice_pipeline(stage1_results.ticketoffice_excels),
+        ),
+        ("saleitemsmop", lambda: run_saleitemsmop_pipeline(stage1_results.saleitemsmop_pdfs)),
+        ("Charges", lambda: run_charges_pipeline(stage1_results.charges_excels)),
+        (
+            "Membership Daily Detailed Totals",
+            lambda: run_membership_pipeline(stage1_results.membership_pdfs),
+        ),
+        ("Klarna DailyTakings", lambda: run_klarna_pipeline(stage1_results.klarna_pdfs)),
+        (
+            "Klarna SeasonEvent MoP",
+            lambda: run_klarna_seasoneventmop_pipeline(
+                stage1_results.klarna_seasoneventmop_pdfs
+            ),
+        ),
+    ]
+
+    for step_index, (name, runner) in enumerate(stage_runners, start=1):
+        count = _run_stage("Stage 2", step_index, name, runner)
+        results.append((name, count))
+
+    return results
+
+def _run_stage(stage_label: str, step_index: int, name: str, runner: Callable[[], int]) -> int:    
     """Execute a mini-pipeline with consistent, expressive logging."""
 
-    prefix = f"Stage 5 – Step {step_index}"
+    prefix = f"{stage_label} – Step {step_index}"
     log.info("%s – %s pipeline starting.", prefix, name)
     count = runner()
     if count < 0:
@@ -128,11 +136,11 @@ def _run_stage(step_index: int, name: str, runner: Callable[[], int]) -> int:
     return count
 
 
-def _log_summary(results: list[tuple[str, int]]) -> None:
+def _log_stage_summary(stage_label: str, results: list[tuple[str, int]]) -> None:
     """Print a clean, aligned summary of all stage results."""
 
     name_width = max((len(name) for name, _ in results), default=0)
-    log.info("Stage 5 – Summary of processed mini-pipelines:")
+    log.info("%s – Summary of processed mini-pipelines:", stage_label)
     for name, count in results:
         padded_name = name.ljust(name_width)
         log.info("  • %s | %4d record(s)", padded_name, count)
