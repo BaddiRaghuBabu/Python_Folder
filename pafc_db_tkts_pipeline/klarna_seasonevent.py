@@ -8,7 +8,7 @@ from typing import Iterable
 
 import camelot
 import pandas as pd
-import json
+
 from .config import (
     KLARNA_SEMOP_INPUT_DIR,
     KLARNA_SEMOP_TABLE_OUTPUT_DIR,
@@ -16,14 +16,10 @@ from .config import (
     MONTHLY_UNIQUE_EVENTS_DIR,
 )
 from .logger import log
-from openai import OpenAI
 
 UNWANTED_KEYWORDS = {"date:", "time:", "page", "mop analysis", "xrreports"}
 RESERVED_TRAILING_HEADERS = ["Total", "VAT", "Total Ex. VAT"]
 CCDVA_COLUMNS = ["Cash", "Credit", "Debit", "Voucher", "Account"]
-
-_CHARGES_TOTALS_WORKBOOK = "charges_totals_all_dates.xlsx"
-_TOTAL_INCOME = "total income"
 
 def _extract_iso_date_from_name(pdf_file: Path) -> str:
     match = re.search(r"(\d{8})", pdf_file.stem)
@@ -125,140 +121,6 @@ def _prepare_ccdva_totals(df: pd.DataFrame) -> pd.DataFrame:
     working_df["Total_CCDVA"] = working_df[CCDVA_COLUMNS].sum(axis=1)
     return working_df
 
-
-class _ChargesValueMatcher:
-    """Resolve charges totals for Season/Event rows using GPT fuzzy matching."""
-
-    def __init__(self) -> None:
-        self._client = OpenAI()
-        self._charges_df = self._load_charges_totals()
-
-    def _load_charges_totals(self) -> pd.DataFrame:
-        workbook = CHARGES_TOTALS_OUTPUT_DIR / _CHARGES_TOTALS_WORKBOOK
-        if not workbook.exists():
-            log.warning(
-                "Charges lookup – totals workbook %s not found; charges_value will be null.",
-                workbook,
-            )
-            return pd.DataFrame(columns=["date", "total_name", "value"])
-
-        try:
-            df = pd.read_excel(workbook)
-        except Exception as exc:  # noqa: BLE001
-            log.error("Charges lookup – failed to read %s: %s", workbook, exc)
-            return pd.DataFrame(columns=["date", "total_name", "value"])
-
-        required = {"date", "total_name", "value"}
-        if not required.issubset(df.columns):
-            log.error(
-                "Charges lookup – workbook %s missing required columns %s; charges_value will be null.",
-                workbook,
-                sorted(required),
-            )
-            return pd.DataFrame(columns=["date", "total_name", "value"])
-
-        cleaned = df.copy()
-        cleaned["date"] = cleaned["date"].astype(str).str.strip()
-        cleaned["total_name"] = (
-            cleaned["total_name"].astype(str).str.strip().str.casefold()
-        )
-        cleaned = cleaned[cleaned["total_name"] != _TOTAL_INCOME]
-        return cleaned
-
-    def _prepare_prompt(self, event: str, candidates: list[str]) -> str:
-        return json.dumps(
-            {
-                "event": event,
-                "charge_totals": candidates,
-                "instruction": (
-                    "Select the charge total that best matches the event. Return JSON with "
-                    "keys 'match' (true/false) and 'chosen_total_name' (string or null). "
-                    "Only choose one when the event and total_name describe the same thing. "
-                    "If unsure, set match to false and chosen_total_name to null."
-                ),
-            }
-        )
-
-    def _ask_model(self, event: str, candidates: list[str]) -> str | None:
-        prompt = self._prepare_prompt(event, candidates)
-        try:
-            response = self._client.chat.completions.create(
-                model="gpt-5-nano",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You match football events to charge totals using concise JSON outputs only.",
-                    },
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0,
-            )
-        except Exception as exc:  # noqa: BLE001
-            log.error("Charges lookup – OpenAI request failed: %s", exc)
-            return None
-
-        content = response.choices[0].message.content
-        if not content:
-            log.warning("Charges lookup – empty OpenAI response for event '%s'.", event)
-            return None
-
-        try:
-            data = json.loads(content)
-        except json.JSONDecodeError:
-            log.error(
-                "Charges lookup – unable to parse model response '%s' for event '%s'.",
-                content,
-                event,
-            )
-            return None
-
-        if not isinstance(data, dict):
-            return None
-
-        if not data.get("match"):
-            return None
-
-        chosen = data.get("chosen_total_name")
-        if not chosen:
-            return None
-        return str(chosen).casefold().strip()
-
-    def _select_candidate(self, chosen: str, candidates: pd.DataFrame) -> float | None:
-        matched = candidates[candidates["total_name"] == chosen]
-        if matched.empty:
-            return None
-        value = matched.iloc[0]["value"]
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    def resolve_value(self, date: str, event: str) -> float | None:
-        if not event:
-            return None
-
-        candidates = self._charges_df[self._charges_df["date"] == str(date).strip()]
-        if candidates.empty:
-            return None
-
-        candidate_names = candidates["total_name"].tolist()
-        chosen = self._ask_model(event, candidate_names)
-        if chosen is None:
-            return None
-
-        return self._select_candidate(chosen, candidates)
-
-
-_charges_matcher: _ChargesValueMatcher | None = None
-
-
-def _get_charges_matcher() -> _ChargesValueMatcher:
-    global _charges_matcher
-    if _charges_matcher is None:
-        _charges_matcher = _ChargesValueMatcher()
-    return _charges_matcher
-
-
 def _process_pdf(pdf_file: Path) -> bool:
     log.info("Processing Klarna Season/Event MoP PDF: %s", pdf_file.name)
     try:
@@ -298,14 +160,6 @@ def _process_pdf(pdf_file: Path) -> bool:
         combined_df.insert(0, "Month", month)
         combined_df.insert(0, "Date", iso_date)
         combined_df = _prepare_ccdva_totals(combined_df)
-        matcher = _get_charges_matcher()
-        if "Event" in combined_df.columns:
-            combined_df["charges_value"] = [
-                matcher.resolve_value(iso_date, str(event))
-                for event in combined_df["Event"]
-            ]
-        else:
-            combined_df["charges_value"] = None
         _ensure_output_dir()
         out_file = KLARNA_SEMOP_TABLE_OUTPUT_DIR / f"{pdf_file.stem}.csv"
         combined_df.to_csv(out_file, index=False)
