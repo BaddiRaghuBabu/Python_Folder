@@ -136,17 +136,16 @@ def _enrich_csv(
         return False
 
     total_names = charges_df["total_name"].tolist()
-    event_matches: list[float | None] = []
-
+    event_matches: list[float | str] = []
     for event in df["Event"].astype(str):
         event_clean = event.strip()
-        if not event_clean or event_clean.lower() == "total income":
-            event_matches.append(None)
+        if not event_clean or event_clean.casefold() == "total income":
+            event_matches.append("")
             continue
 
         match = _match_event_to_total(client, event_clean, total_names, charges_embeddings)
         if match is None:
-            event_matches.append(None)
+            event_matches.append("")            
             continue
 
         matched_total, _score = match
@@ -189,7 +188,15 @@ def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
         if charges_df is None:
             continue
 
-        charges_embeddings = _embed_texts(client, charges_df["total_name"].tolist())
+        usable_charges_df = charges_df[charges_df["total_name"].str.casefold() != "total income"].reset_index(drop=True)
+        if usable_charges_df.empty:
+            log.warning(
+                "Charges/Klarna enrichment – charges workbook %s contains only ignored totals; skipping.",
+                charges_df,
+            )
+            continue
+
+        charges_embeddings = _embed_texts(client, usable_charges_df["total_name"].tolist())
 
         csv_file = KLARNA_SEMOP_TABLE_OUTPUT_DIR / f"{Path(pdf_path).stem}.csv"
         if not csv_file.exists():
@@ -200,7 +207,7 @@ def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
             continue
 
         processed_any = True
-        if not _enrich_csv(client, csv_file, charges_df, charges_embeddings):
+        if not _enrich_csv(client, csv_file, usable_charges_df, charges_embeddings):
             total_success = False
 
     if not processed_any:
