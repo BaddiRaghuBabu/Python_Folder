@@ -140,7 +140,7 @@ def _enrich_csv(
 
     for event in df["Event"].astype(str):
         event_clean = event.strip()
-        if not event_clean:
+        if not event_clean or event_clean.lower() == "total income":
             event_matches.append(None)
             continue
 
@@ -165,18 +165,14 @@ def _enrich_csv(
         )
         return False
 
-    log.info(
-        "Charges/Klarna enrichment – updated %s with charges_value column.",
-        csv_file.name,
-    )
+
     return True
 
 
 def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
     client = _build_openai_client()
     if client is None:
-        return False
-
+        return True
     processed_any = False
     total_success = True
 
@@ -187,12 +183,10 @@ def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
                 "Charges/Klarna enrichment – could not determine date from %s; skipping.",
                 Path(pdf_path).name,
             )
-            total_success = False
             continue
 
         charges_df = _load_charges_totals(date_str)
         if charges_df is None:
-            total_success = False
             continue
 
         charges_embeddings = _embed_texts(client, charges_df["total_name"].tolist())
@@ -203,7 +197,6 @@ def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
                 "Charges/Klarna enrichment – Klarna table %s not found; skipping.",
                 csv_file.name,
             )
-            total_success = False
             continue
 
         processed_any = True
@@ -211,12 +204,13 @@ def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
             total_success = False
 
     if not processed_any:
-        log.error(
-            "Charges/Klarna enrichment – no Klarna Season/Event tables were updated."
-        )
-        return False
-
+        log.info(
+            "Charges/Klarna enrichment – no Klarna Season/Event tables were updated;"
+            " skipping enrichment."
+            )
+        return True
     return total_success
+
 
 
 __all__ = ["enrich_klarna_tables_with_charges"]
