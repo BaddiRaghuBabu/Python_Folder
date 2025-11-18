@@ -85,17 +85,46 @@ def _cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
     return float(np.dot(a, b) / denom)
 
 
+
 def _embed_texts(client: OpenAI, texts: list[str]) -> list[list[float]]:
     response = client.embeddings.create(model="text-embedding-3-small", input=texts)
     return [item.embedding for item in response.data]
 
+def _normalize_label(label: str) -> str:
+    """Return a simplified label to catch common name/date variations.
+
+    This is intentionally conservative: it strips dates, punctuation, leading
+    "total" markers, and known suffixes like "travel" so that inputs such as
+    "Total Mansfield Town Coach Travel" and "Mansfield Town Coach - 11/10/25"
+    normalize to the same string.
+    """
+
+    cleaned = label.lower()
+    cleaned = re.sub(r"\btotal\b", "", cleaned)
+    cleaned = re.sub(r"\btravel\b", "", cleaned)
+    cleaned = re.sub(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b", "", cleaned)
+    cleaned = re.sub(r"[^a-z0-9]+", " ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
+def _build_normalized_total_map(total_names: list[str]) -> dict[str, str]:
+    normalized: dict[str, str] = {}
+    for name in total_names:
+        normalized.setdefault(_normalize_label(name), name)
+    return normalized
 
 def _match_event_to_total(
     client: OpenAI,
     event: str,
     total_names: list[str],
     total_embeddings: list[list[float]],
+    normalized_totals: dict[str, str],
 ) -> tuple[str, float] | None:
+    normalized_event = _normalize_label(event)
+    if normalized_event in normalized_totals:
+        matched_name = normalized_totals[normalized_event]
+        return matched_name, 1.0
     event_embedding = _embed_texts(client, [event])[0]
     best_index = -1
     best_score = -math.inf
@@ -138,14 +167,21 @@ def _enrich_csv(
     total_names = charges_df["total_name"].tolist()
     event_matches: list[float | str] = []
     for event in df["Event"].astype(str):
+        normalized_totals = _build_normalized_total_map(total_names)
         event_clean = event.strip()
         if not event_clean or event_clean.casefold() == "total income":
             event_matches.append("")
             continue
 
-        match = _match_event_to_total(client, event_clean, total_names, charges_embeddings)
+        match = _match_event_to_total(
+            client,
+            event_clean,
+            total_names,
+            charges_embeddings,
+            normalized_totals,
+        )
         if match is None:
-            event_matches.append("")            
+            event_matches.append("")
             continue
 
         matched_total, _score = match
@@ -212,9 +248,9 @@ def enrich_klarna_tables_with_charges(pdf_paths: Iterable[Path]) -> bool:
 
     if not processed_any:
         log.info(
-            "Charges/Klarna enrichment – no Klarna Season/Event tables were updated;"
-            " skipping enrichment."
-            )
+            "Charges/Klarna enrichment – no Klarna Season/Event tables were updated;",
+            " skipping enrichment.",
+        )
         return True
     return total_success
 

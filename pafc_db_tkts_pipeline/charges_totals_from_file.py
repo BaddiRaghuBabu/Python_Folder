@@ -58,7 +58,7 @@ def extract_totals_from_file(path: Path) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     inside_income = False
     date_str = _extract_date_from_filename(path.name)
-
+    seen_totals: set[str] = set()
     for _, row in df.iterrows():
         raw_values = list(row)
         texts: list[str] = []
@@ -87,6 +87,9 @@ def extract_totals_from_file(path: Path) -> list[dict[str, object]]:
         if not total_name:
             continue
 
+        if total_name in seen_totals:
+            continue
+
         numeric_values: list[float] = []
         for cell in raw_values:
             number = _parse_float(cell)
@@ -108,6 +111,8 @@ def extract_totals_from_file(path: Path) -> list[dict[str, object]]:
                 "value": value,
             }
         )
+
+        seen_totals.add(total_name)
 
     return rows
 
