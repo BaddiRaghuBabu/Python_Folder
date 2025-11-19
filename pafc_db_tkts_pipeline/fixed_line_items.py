@@ -50,7 +50,7 @@ from .klarna_seasonevent import (
     build_monthly_unique_events_list,
     export_klarna_seasonevent_tables,
 )
-from .klarna_charges_value_enricher import enrich_klarna_tables_with_charges
+# from .klarna_charges_value_enricher import enrich_klarna_tables_with_charges
 from .charges_total_postel_charges import write_charges_postal_detail_excels
 from .charges_totals_from_file import write_charges_totals_excels
 
@@ -382,13 +382,13 @@ def run_klarna_seasoneventmop_pipeline(pdfs: list[Path] | None = None) -> int:
         )
         return -1
     
-    export_klarna_seasonevent_tables(processed_paths)
-    build_monthly_unique_events_list()
-    if not enrich_klarna_tables_with_charges(processed_paths):
-        log.error(
-            "Klarna SeasonEvent MoP pipeline aborted – charges/value enrichment FAILED."
-        )
-        return -1
+    # export_klarna_seasonevent_tables(processed_paths)
+    # build_monthly_unique_events_list()
+    # if not enrich_klarna_tables_with_charges(processed_paths):
+    #     log.error(
+    #         "Klarna SeasonEvent MoP pipeline aborted – charges/value enrichment FAILED."
+    #     )
+    #     return -1
     write_klarna_seasoneventmop_csv(rows)
     log.info(
         "Klarna SeasonEvent MoP pipeline finished with %d record(s).",

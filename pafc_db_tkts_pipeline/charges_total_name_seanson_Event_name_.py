@@ -6,112 +6,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import (
-    CHARGES_EVENT_TOTAL_REPORT_DIR,
-    CHARGES_EVENT_TOTAL_REPORT_XLSX,
-    CHARGES_TOTALS_OUTPUT_DIR,
-    KLARNA_SEMOP_TABLE_OUTPUT_DIR,
-)
+from .config import CHARGES_EVENT_TOTAL_REPORT_DIR, CHARGES_EVENT_TOTAL_REPORT_XLSX
+from .event_ import collect_events
 from .logger import log
 
+from .total_name import collect_total_names
 
-_TOTALS_WORKBOOK = "charges_totals_all_dates.xlsx"
-_EVENT_COLUMN = "Event"
-_SKIP_EVENT_VALUES = {"total for the period"}
-_SKIP_TOTAL_NAME_VALUES = {"total income"}
-
-
-def _unique_preserve_order(values: list[str]) -> list[str]:
-    """Return values preserving first occurrence order while dropping duplicates."""
-
-    seen: set[str] = set()
-    unique: list[str] = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        unique.append(value)
-    return unique
-
-def _clean_series(values: pd.Series) -> list[str]:
-    cleaned: list[str] = []
-    for value in values.dropna().astype(str):
-        stripped = value.strip()
-        if not stripped:
-            continue
-        cleaned.append(stripped)
-    return cleaned
-
-
-def _collect_events() -> list[str]:
-    csv_files = sorted(KLARNA_SEMOP_TABLE_OUTPUT_DIR.glob("*.csv"))
-    if not csv_files:
-        log.warning(
-            "Charges/Klarna report – no Season/Event CSV files found in %s.",
-            KLARNA_SEMOP_TABLE_OUTPUT_DIR,
-        )
-        return []
-
-    events: list[str] = []
-    for csv_file in csv_files:
-        try:
-            df = pd.read_csv(csv_file)
-        except Exception as exc:  # noqa: BLE001
-            log.error(
-                "Charges/Klarna report – failed to read Season/Event CSV %s: %s",
-                csv_file,
-                exc,
-            )
-            continue
-
-        if _EVENT_COLUMN not in df.columns:
-            log.warning(
-                "Charges/Klarna report – file %s is missing '%s' column; skipping.",
-                csv_file.name,
-                _EVENT_COLUMN,
-            )
-            continue
-
-        for value in _clean_series(df[_EVENT_COLUMN]):
-            if value.casefold() in _SKIP_EVENT_VALUES:
-                continue
-            events.append(value)
-
-    return _unique_preserve_order(events)
-
-def _collect_total_names() -> list[str]:
-    totals_workbook = CHARGES_TOTALS_OUTPUT_DIR / _TOTALS_WORKBOOK
-    if not totals_workbook.exists():
-        log.warning(
-            "Charges/Klarna report – totals workbook %s not found.",
-            totals_workbook,
-        )
-        return []
-
-    try:
-        df = pd.read_excel(totals_workbook)
-    except Exception as exc:  # noqa: BLE001
-        log.error(
-            "Charges/Klarna report – failed to read totals workbook %s: %s",
-            totals_workbook,
-            exc,
-        )
-        return []
-
-    if "total_name" not in df.columns:
-        log.warning(
-            "Charges/Klarna report – totals workbook %s missing 'total_name'; skipping.",
-            totals_workbook,
-        )
-        return []
-
-    total_names: list[str] = []
-    for value in _clean_series(df["total_name"]):
-        if value.casefold() in _SKIP_TOTAL_NAME_VALUES:
-            continue
-        total_names.append(value)
-
-    return _unique_preserve_order(total_names)
 
 def _write_report(events: list[str], total_names: list[str]) -> Path | None:
     if not events and not total_names:
@@ -139,8 +39,8 @@ def _write_report(events: list[str], total_names: list[str]) -> Path | None:
 def generate_charges_total_name_season_event_report() -> Path | None:
     """Create an Excel report with Season/Event names and Charges total names."""
 
-    events = _collect_events()
-    totals = _collect_total_names()
+    events = collect_events()
+    totals = collect_total_names()
     return _write_report(events, totals)
 
 
