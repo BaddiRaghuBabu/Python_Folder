@@ -382,13 +382,13 @@ def run_klarna_seasoneventmop_pipeline(pdfs: list[Path] | None = None) -> int:
         )
         return -1
     
-    # export_klarna_seasonevent_tables(processed_paths)
-    # build_monthly_unique_events_list()
-    # if not enrich_klarna_tables_with_charges(processed_paths):
-    #     log.error(
-    #         "Klarna SeasonEvent MoP pipeline aborted – charges/value enrichment FAILED."
-    #     )
-    #     return -1
+    export_klarna_seasonevent_tables(processed_paths)
+    build_monthly_unique_events_list()
+    if not enrich_klarna_tables_with_charges(processed_paths):
+        log.error(
+            "Klarna SeasonEvent MoP pipeline aborted – charges/value enrichment FAILED."
+        )
+        return -1
     write_klarna_seasoneventmop_csv(rows)
     log.info(
         "Klarna SeasonEvent MoP pipeline finished with %d record(s).",

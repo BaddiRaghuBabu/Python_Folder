@@ -85,7 +85,6 @@ def main() -> None:
     )
 
     _log_stage_summary("Stage 2", results)
-    
 
 
 def run_stage2_pipelines(stage1_results: Stage1Results) -> list[tuple[str, int]]:
