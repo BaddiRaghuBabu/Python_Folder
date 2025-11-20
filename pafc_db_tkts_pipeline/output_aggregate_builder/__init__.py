@@ -64,6 +64,9 @@ Typical flow:
   16. build_expected_total_column()
         -> adds:
            expected_total
+  17. build_status_expected_and_actual_total_column()
+        -> adds:
+           Status
 """
 
 from .saleitemsmop_total_amount_aggregate import (
@@ -104,3 +107,7 @@ from .xero_postage_aggregate import build_xero_postage_column
 from .actual_total_aggregate import build_actual_total_column
 from .expected_total_aggregate import build_expected_total_column
 
+from .status_expected_and_actual_total_aggregate import (
+    build_status_expected_and_actual_total_column,
+
+)
