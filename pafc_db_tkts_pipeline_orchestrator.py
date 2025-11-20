@@ -48,6 +48,7 @@ from pafc_db_tkts_pipeline.output_aggregate_builder import (
     build_klarna_dailytakings_data_columns,       # 10–14: Klarna MoPs
     build_total_ticketing_income_column,          # 15th column
     build_total_postal_charges_column,            # 16th column
+    build_xero_ccdva_less_charges_column,         # 17th column
     
 )
 
@@ -76,7 +77,9 @@ def main() -> None:
     build_klarna_dailytakings_data_columns()
     build_total_ticketing_income_column()
     build_total_postal_charges_column()
+    build_xero_ccdva_less_charges_column()
     generate_charges_total_name_season_event_report()
+    
 
     # Final summary
     log.info(
