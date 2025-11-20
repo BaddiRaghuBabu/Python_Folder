@@ -45,10 +45,14 @@ Typical flow:
   10. build_xero_ccdva_less_charges_column()
         -> adds:
             xero_ccdva_less_charges
-            11. build_xero_booking_fee_column()
+
+ 11. build_xero_evergreen_column()
         -> adds:
+            xero_evergreen
+  12. build_xero_booking_fee_column()
+            -> adds:
             xero_booking_fee
-  12. build_xero_postage_column()
+  13. build_xero_postage_column()
         -> adds:
             xero_postage
 """

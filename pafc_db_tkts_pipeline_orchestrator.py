@@ -49,8 +49,11 @@ from pafc_db_tkts_pipeline.output_aggregate_builder import (
     build_total_ticketing_income_column,          # 15th column
     build_total_postal_charges_column,            # 16th column
     build_xero_ccdva_less_charges_column,         # 17th column
-    build_xero_booking_fee_column,                # 18th column
-    build_xero_postage_column,                    # 19th column
+    build_xero_evergreen_column,                  # 18th column
+    build_xero_booking_fee_column,                # 19th column
+    build_xero_postage_column,                    # 20th column
+    
+    
 )
 
 from pafc_db_tkts_pipeline.charges_total_name_seanson_Event_name_ import (
@@ -79,9 +82,11 @@ def main() -> None:
     build_total_ticketing_income_column()
     build_total_postal_charges_column()
     build_xero_ccdva_less_charges_column()
+    build_xero_evergreen_column()
     generate_charges_total_name_season_event_report()
     build_xero_booking_fee_column()
     build_xero_postage_column()
+    
 
     # Final summary
     log.info(
