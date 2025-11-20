@@ -48,6 +48,9 @@ Typical flow:
             11. build_xero_booking_fee_column()
         -> adds:
             xero_booking_fee
+  12. build_xero_postage_column()
+        -> adds:
+            xero_postage
 """
 
 from .saleitemsmop_total_amount_aggregate import (
@@ -82,4 +85,5 @@ from .xero_ccdva_less_charges_aggregate import (
     
 )
 from .xero_booking_fee_aggregate import build_xero_booking_fee_column
+from .xero_postage_aggregate import build_xero_postage_column
 
