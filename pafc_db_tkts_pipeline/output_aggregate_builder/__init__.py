@@ -42,9 +42,12 @@ Typical flow:
   9. build_total_postal_charges_column()
         -> adds:
             Total Postal Charges
- 10. build_xero_ccdva_less_charges_column()
+  10. build_xero_ccdva_less_charges_column()
         -> adds:
             xero_ccdva_less_charges
+            11. build_xero_booking_fee_column()
+        -> adds:
+            xero_booking_fee
 """
 
 from .saleitemsmop_total_amount_aggregate import (
@@ -76,4 +79,7 @@ from .SeasonEvent_total_postel_charges_data_aggregate import (
 )
 from .xero_ccdva_less_charges_aggregate import (
     build_xero_ccdva_less_charges_column,
+    
 )
+from .xero_booking_fee_aggregate import build_xero_booking_fee_column
+
