@@ -54,6 +54,7 @@ from pafc_db_tkts_pipeline.output_aggregate_builder import (
     build_xero_booking_fee_column,                # 20th column
     build_xero_postage_column,                    # 21st column
     build_actual_total_column,                    # 22nd column
+    build_expected_total_column,                  # 23th column
     
 )
 
@@ -89,6 +90,7 @@ def main() -> None:
     build_xero_booking_fee_column()
     build_xero_postage_column()
     build_actual_total_column()
+    build_expected_total_column()
     
 
     # Final summary
