@@ -11,52 +11,41 @@ _COLUMN_NAME = "xero_booking_fee"
 _DEPENDENT_COLUMNS = {"charges_total", "charges_postal"}
 
 
-def _normalise_value(value: object) -> float:
-    """Convert aggregate string values into floats.
-
-    The charges columns may contain placeholders like "File Unavailable" or
-    "Data Unavailable"; per requirements these are treated as zero. Numeric
-    strings that include commas or parentheses are also supported. Any
-    unparsable value is logged and treated as zero to keep the pipeline
-    resilient.
+def _series_to_number(col: pd.Series) -> pd.Series:
     """
+    Convert a string Series to float.
 
-    if value is None:
-        return 0.0
+    Rules:
+    - 'File Unavailable', 'Data Unavailable',
+      'Data Not Available In File', etc. -> 0
+    - blanks / 'nan' / 'null' / 'none' -> 0
+    - commas removed, brackets "(123.45)" -> -123.45
+    - anything unparsable -> 0
+    """
+    s = col.astype(str).fillna("0").str.strip()
 
-    if isinstance(value, str):
-        text = value.strip()
-        if not text or text.lower() == "nan":
-            return 0.0
+    lower = s.str.lower()
+    mask_unavail = lower.str.contains("unavailable") | lower.str.contains("not available")
+    mask_empty = lower.isin({"", "nan", "null", "none"})
 
-        placeholder = text.casefold()
-        if placeholder in {"file unavailable", "data unavailable"}:
-            return 0.0
+    # treat all unavailable / empty as 0
+    s = s.mask(mask_unavail | mask_empty, "0")
 
-        negative = text.startswith("(") and text.endswith(")")
-        cleaned = text.strip("()").replace(",", "")
-    else:
-        if pd.isna(value):
-            return 0.0
-        negative = False
-        cleaned = str(value)
+    # remove commas
+    s = s.str.replace(",", "", regex=False)
 
-    try:
-        number = float(cleaned)
-    except ValueError:
-        log.warning(
-            "Xero booking fee aggregate – could not parse value '%s'; using 0.",
-            value,
-        )
-        return 0.0
+    # bracket negatives: "(12.50)" -> "-12.50"
+    s = s.str.replace(r"\(([^)]+)\)", r"-\1", regex=True)
 
-    if negative:
-        number = -number
-    return number
+    numeric = pd.to_numeric(s, errors="coerce").fillna(0.0)
+    return numeric
 
 
 def build_xero_booking_fee_column() -> None:
-    """Add ``xero_booking_fee`` column derived from charges totals."""
+    """Add ``xero_booking_fee`` column derived from charges totals.
+
+    xero_booking_fee = charges_total - charges_postal
+    """
 
     try:
         base_df = pd.read_csv(TICKETOFFICE_SALE_COMBINED_CSV, dtype=str)
@@ -77,14 +66,21 @@ def build_xero_booking_fee_column() -> None:
         )
         return
 
-    column_values: list[str] = []
-    for _, row in base_df.iterrows():
-        charges_total = _normalise_value(row.get("charges_total"))
-        charges_postal = _normalise_value(row.get("charges_postal"))
-        booking_fee = charges_total - charges_postal
-        column_values.append(f"{booking_fee:.2f}")
+    if "date" not in base_df.columns:
+        log.error(
+            "Xero booking fee aggregate – base file %s missing 'date' column.",
+            TICKETOFFICE_SALE_COMBINED_CSV,
+        )
+        return
 
-    base_df[_COLUMN_NAME] = column_values
+    charges_total_num = _series_to_number(base_df["charges_total"])
+    charges_postal_num = _series_to_number(base_df["charges_postal"])
+
+    booking_fee = charges_total_num - charges_postal_num
+
+    # format as 2-decimal currency string, e.g. 753.75 / 0.00
+    base_df[_COLUMN_NAME] = booking_fee.round(2).map(lambda x: f"{x:.2f}")
+
     base_df.sort_values("date", inplace=True)
     base_df.reset_index(drop=True, inplace=True)
     base_df.to_csv(TICKETOFFICE_SALE_COMBINED_CSV, index=False, encoding="utf-8-sig")

@@ -12,45 +12,58 @@ _TOTAL_COLUMN = "mddto_evergreen_total"
 _OTHER_COLUMN = "mddto_evergreen_other"
 
 
-_UNAVAILABLE_MARKERS = {"file unavailable", "data unavailable"}
+# any of these words inside the cell => treat as 0
+_UNAVAILABLE_KEYWORDS = ("unavailable", "not available")
 
 
-def _coerce_to_number(value: object) -> float:
-    """Convert numeric-looking values to float; treat unavailable as 0."""
+def _series_to_number(col: pd.Series) -> pd.Series:
+    """
+    Convert a string Series to float.
 
-    if value is None:
-        return 0.0
+    - 'File Unavailable', 'Data Unavailable',
+      'Data Not Available In File', etc. -> 0
+    - blanks / 'nan' / 'null' / 'none' -> 0
+    - commas removed, brackets "(123.45)" -> -123.45
+    """
 
-    if isinstance(value, str):
-        cleaned = value.strip()
-        if not cleaned or cleaned.lower() == "nan":
-            return 0.0
-        if cleaned.lower() in _UNAVAILABLE_MARKERS:
-            return 0.0
-        cleaned = cleaned.replace(",", "")
-    else:
-        cleaned = value
+    s = col.astype(str).fillna("0").str.strip()
 
-    try:
-        numeric_value = float(cleaned)
-    except Exception:  # noqa: BLE001
-        return 0.0
+    lower = s.str.lower()
+    mask_unavail = lower.str.contains("unavailable") | lower.str.contains("not available")
+    mask_empty = lower.isin({"", "nan", "null", "none"})
 
-    if pd.isna(numeric_value):
-        return 0.0
+    # set all unavailable / empty to "0"
+    s = s.mask(mask_unavail | mask_empty, "0")
 
-    return float(numeric_value)
+    # remove commas
+    s = s.str.replace(",", "", regex=False)
+
+    # brackets → negative: "(12.50)" → "-12.50"
+    s = s.str.replace(r"\(([^)]+)\)", r"-\1", regex=True)
+
+    # final conversion, anything weird becomes 0
+    numeric = pd.to_numeric(s, errors="coerce").fillna(0.0)
+
+    return numeric
 
 
-def _format_result(value: float) -> str:
-    return str(int(value)) if value.is_integer() else str(value)
+def _format_result_series(values: pd.Series) -> list[str]:
+    """Convert floats to strings, dropping .0 when it is an integer."""
+    out: list[str] = []
+    for v in values:
+        fv = float(v)
+        if fv.is_integer():
+            out.append(str(int(fv)))
+        else:
+            out.append(str(fv))
+    return out
 
 
 def build_xero_evergreen_column() -> None:
     """Add Xero evergreen totals into aggregate_data.csv.
 
-    Calculates ``mddto_evergreen_total - mddto_evergreen_other`` per row.
-    Missing/unavailable inputs are treated as 0 before subtraction.
+    xero_evergreen = mddto_evergreen_total - mddto_evergreen_other
+    (unavailable / null / blank values are treated as 0 first)
     """
 
     try:
@@ -72,16 +85,14 @@ def build_xero_evergreen_column() -> None:
         )
         return
 
-    totals = base_df[_TOTAL_COLUMN].astype(str)
-    others = base_df[_OTHER_COLUMN].astype(str)
+    # robust numeric conversion
+    total_num = _series_to_number(base_df[_TOTAL_COLUMN])
+    other_num = _series_to_number(base_df[_OTHER_COLUMN])
 
-    evergreen_values: list[str] = []
-    for total_raw, other_raw in zip(totals, others):
-        total_val = _coerce_to_number(total_raw)
-        other_val = _coerce_to_number(other_raw)
-        evergreen_values.append(_format_result(total_val - other_val))
+    result = total_num - other_num  # <-- THIS WILL DO 138 - (-135) = 273, etc.
 
-    base_df[_COLUMN_NAME] = evergreen_values
+    base_df[_COLUMN_NAME] = _format_result_series(result)
+
     base_df.sort_values("date", inplace=True)
     base_df.reset_index(drop=True, inplace=True)
     base_df.to_csv(TICKETOFFICE_SALE_COMBINED_CSV, index=False, encoding="utf-8-sig")
