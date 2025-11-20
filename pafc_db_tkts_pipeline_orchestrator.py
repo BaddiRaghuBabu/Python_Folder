@@ -53,7 +53,7 @@ from pafc_db_tkts_pipeline.output_aggregate_builder import (
     build_xero_evergreen_column,                  # 19th column
     build_xero_booking_fee_column,                # 20th column
     build_xero_postage_column,                    # 21st column
-    
+    build_actual_total_column,                    # 22nd column
     
 )
 
@@ -88,6 +88,7 @@ def main() -> None:
     generate_charges_total_name_season_event_report()
     build_xero_booking_fee_column()
     build_xero_postage_column()
+    build_actual_total_column()
     
 
     # Final summary

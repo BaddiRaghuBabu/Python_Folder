@@ -58,6 +58,9 @@ Typical flow:
   14. build_xero_postage_column()      
        -> adds:
             xero_postage
+  15. build_actual_total_column()
+       -> adds:
+           actual_total
 """
 
 from .saleitemsmop_total_amount_aggregate import (
@@ -95,4 +98,5 @@ from .xero_on_account_aggregate import build_xero_on_account_column
 from .xero_evergreen_aggregate import build_xero_evergreen_column
 from .xero_booking_fee_aggregate import build_xero_booking_fee_column
 from .xero_postage_aggregate import build_xero_postage_column
+from .actual_total_aggregate import build_actual_total_column
 
