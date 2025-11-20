@@ -36,24 +36,27 @@ Typical flow:
                k_dailytakings_debit,
                k_dailytakings_voucher,
                k_dailytakings_account
-  8. build_total_ticketing_income_column()
+  8. build_xero_on_account_column()
+        -> adds:
+            xero_on_account
+  9. build_total_ticketing_income_column()
         -> adds:
             Total Ticketing Income
-  9. build_total_postal_charges_column()
-        -> adds:
+  11. build_xero_ccdva_less_charges_column()
+       -> adds:
             Total Postal Charges
   10. build_xero_ccdva_less_charges_column()
         -> adds:
             xero_ccdva_less_charges
 
- 11. build_xero_evergreen_column()
+  12. build_xero_evergreen_column()       
         -> adds:
             xero_evergreen
-  12. build_xero_booking_fee_column()
-            -> adds:
+  13. build_xero_booking_fee_column()           
+       -> adds:
             xero_booking_fee
-  13. build_xero_postage_column()
-        -> adds:
+  14. build_xero_postage_column()      
+       -> adds:
             xero_postage
 """
 
@@ -75,9 +78,8 @@ from .membership_waiting_list_gross_aggregete import (
 from .membership_total_all_sales_gross_aggregete import (
     build_membership_total_all_sales_gross_column,
 )
-from .k_dailytakings_data_aggregate import (
-    build_klarna_dailytakings_data_columns,
-)
+from .k_dailytakings_data_aggregate import build_klarna_dailytakings_data_columns
+from .xero_on_account_aggregate import build_xero_on_account_column
 from .SeasonEvent_total_ticketing_income_data_aggregate import (
     build_total_ticketing_income_column,
 )
