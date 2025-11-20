@@ -78,8 +78,9 @@ from .membership_waiting_list_gross_aggregete import (
 from .membership_total_all_sales_gross_aggregete import (
     build_membership_total_all_sales_gross_column,
 )
-from .k_dailytakings_data_aggregate import build_klarna_dailytakings_data_columns
-from .xero_on_account_aggregate import build_xero_on_account_column
+from .k_dailytakings_data_aggregate import (
+    build_klarna_dailytakings_data_columns,
+)
 from .SeasonEvent_total_ticketing_income_data_aggregate import (
     build_total_ticketing_income_column,
 )
@@ -90,6 +91,7 @@ from .xero_ccdva_less_charges_aggregate import (
     build_xero_ccdva_less_charges_column,
     
 )
+from .xero_on_account_aggregate import build_xero_on_account_column
 from .xero_evergreen_aggregate import build_xero_evergreen_column
 from .xero_booking_fee_aggregate import build_xero_booking_fee_column
 from .xero_postage_aggregate import build_xero_postage_column
