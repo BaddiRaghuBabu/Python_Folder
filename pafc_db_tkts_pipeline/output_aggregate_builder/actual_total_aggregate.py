@@ -14,6 +14,8 @@ _DEPENDENT_COLUMNS = (
     "xero_evergreen",
     "xero_on_account",
     "xero_ccdva_less_charges",
+    "mddto_miles_gross",
+
 )
 
 
@@ -47,7 +49,9 @@ def build_actual_total_column() -> None:
     """Add ``actual_total`` as the sum of relevant Xero columns.
 
     actual_total = xero_booking_fee + xero_postage + xero_evergreen
-                   + xero_on_account + xero_ccdva_less_charges
+                   + xero_on_account + xero_ccdva_less_charges                  
+                   + mddto_miles_gross
+
     """
 
     try:
@@ -89,6 +93,7 @@ def build_actual_total_column() -> None:
         _COLUMN_NAME,
         len(base_df),
     )
+
 
 
 __all__ = ["build_actual_total_column"]
