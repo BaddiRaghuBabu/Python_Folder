@@ -13,22 +13,25 @@ _AMOUNT_RE = re.compile(r"\(?-?\d{1,3}(?:,\d{3})*\.\d{2}\)?")
 
 def _normalise_amount(raw: str) -> str:
     """
-    Turn strings like '2,128.45' or '(9.00)' into '2128.45' / '9.00'.
-    Any minus/brackets are removed – we just want the absolute value.
+    Turn strings like '2,128.45' or '(9.00)' into '2128.45' / '-9.00'.
+    Preserves the negative sign when the PDF shows a minus or parentheses.
     """
+    raw_text = raw.strip()
+    is_negative = raw_text.startswith("(") or raw_text.startswith("-")
     cleaned = (
-        raw.replace("(", "")
+        raw_text.replace("(", "")
         .replace(")", "")
         .replace(",", "")
         .strip()
     )
-    # drop leading minus if present
+
     if cleaned.startswith("-"):
         cleaned = cleaned[1:]
 
     try:
         value = float(cleaned)
-        return f"{value:.2f}"
+        if is_negative:
+            value = -value
     except ValueError:
         return cleaned
 
