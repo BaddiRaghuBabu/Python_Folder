@@ -9,7 +9,7 @@ import pandas as pd
 from ..config import CHARGES_POSTAL_OUTPUT_DIR, TICKETOFFICE_SALE_COMBINED_CSV
 from ..logger import log
 
-_COLUMN_NAME = "Total Postal Charges"
+_COLUMN_NAME = "charges_postal"
 _POSTAL_FILENAME_TEMPLATE = "charges_postel_{date}.xlsx"
 _TARGET_ROW_LABEL = "Total Charges Postal"
 
@@ -93,8 +93,7 @@ def _write_with_constant(base_df: pd.DataFrame, constant: str) -> None:
 
 
 def build_total_postal_charges_column() -> None:
-    """Populate the 'Total Postal Charges' column in aggregate_data.csv."""
-
+    """Populate the 'charges_postal' column in aggregate_data.csv."""
     try:
         base_df = pd.read_csv(TICKETOFFICE_SALE_COMBINED_CSV, dtype=str)
     except FileNotFoundError:

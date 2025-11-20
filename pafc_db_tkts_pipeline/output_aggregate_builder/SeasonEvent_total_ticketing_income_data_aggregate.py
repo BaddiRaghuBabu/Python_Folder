@@ -11,8 +11,7 @@ from ..logger import log
 
 _TOTALS_WORKBOOK = "charges_totals_all_dates.xlsx"
 _TARGET_TOTAL_NAME = "Total INCOME"
-_COLUMN_NAME = "Total Ticketing Income"
-
+_COLUMN_NAME = "charges_total"
 
 def _clean_ticketing_value(value: object) -> str | None:
     if value is None:
