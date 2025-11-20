@@ -50,6 +50,7 @@ from .klarna_seasonevent import (
     build_monthly_unique_events_list,
     export_klarna_seasonevent_tables,
 )
+from .ccdva_less_charges import add_ccdva_less_charges_column
 from .klarna_charges_value_enricher import enrich_klarna_tables_with_charges
 from .charges_total_postel_charges import write_charges_postal_detail_excels
 from .charges_totals_from_file import write_charges_totals_excels
@@ -389,6 +390,11 @@ def run_klarna_seasoneventmop_pipeline(pdfs: list[Path] | None = None) -> int:
     if not enrich_klarna_tables_with_charges(processed_paths):
         log.error(
             "Klarna SeasonEvent MoP pipeline aborted – charges/value enrichment FAILED."
+        )
+        return -1
+    if not add_ccdva_less_charges_column(processed_paths):
+        log.error(
+            "Klarna SeasonEvent MoP pipeline aborted – CCDVA less charges enrichment FAILED."
         )
         return -1
     write_klarna_seasoneventmop_csv(rows)
