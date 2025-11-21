@@ -12,17 +12,12 @@ _AMOUNT_RE = re.compile(r"\(?-?\d{1,3}(?:,\d{3})*\.\d{2}\)?")
 
 
 def _normalise_amount(raw: str) -> str:
-    """
-    Turn strings like '2,128.45' or '(9.00)' into '2128.45' / '9.00'.
-    Any minus/brackets are removed – we just want the absolute value.
-    """
-    cleaned = (
-        raw.replace("(", "")
-        .replace(")", "")
-        .replace(",", "")
-        .strip()
-    )
-    # drop leading minus if present
+    """Turn strings like '2,128.45' or '(9.00)' into signed numbers."""
+
+    stripped = raw.strip()
+    is_negative = stripped.startswith("(") or stripped.startswith("-")
+
+    cleaned = stripped.replace("(", "").replace(")", "").replace(",", "")
     if cleaned.startswith("-"):
         cleaned = cleaned[1:]
 
@@ -30,7 +25,8 @@ def _normalise_amount(raw: str) -> str:
         value = float(cleaned)
     except ValueError:
         return cleaned
-    
+    if is_negative:
+        value = -value
     return f"{value:.2f}"
 
 
