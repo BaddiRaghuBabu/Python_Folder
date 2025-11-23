@@ -9,8 +9,11 @@ import pandas as pd
 from .config import CHARGES_POSTAL_OUTPUT_DIR
 from .logger import log
 
-
 POSTAL_LABEL = "Postal Charge"
+_SECTION_MARKERS: list[tuple[str, str]] = [
+    ("INCOME", "Total INCOME"),
+    ("NON INCOME", "Total NON INCOME"),
+]
 
 
 def _parse_float(value: str, file_name: str, row_idx: int) -> float | None:
@@ -42,36 +45,52 @@ def _parse_float(value: str, file_name: str, row_idx: int) -> float | None:
     return number
 
 
-def _get_income_block(df: pd.DataFrame, file_name: str) -> pd.DataFrame | None:
-    """Return the rows between the first INCOME and the first Total INCOME."""
+def _get_section_blocks(df: pd.DataFrame, file_name: str) -> list[pd.DataFrame]:
+    """Return rows from both INCOME and NON INCOME sections."""
 
     df = df.fillna("")
+    blocks: list[pd.DataFrame] = []
 
-    income_mask = df.apply(
-        lambda row: row.astype(str)
-        .str.contains(r"\bINCOME\b", case=False, regex=True)
-        .any(),
-        axis=1,
-    )
-    income_indices = [idx for idx, flag in income_mask.items() if flag]
-    if not income_indices:
-        log.error("Charges postal – 'INCOME' not found in %s.", file_name)
-        return None
-    start_idx = income_indices[0]
+    for start_label, stop_label in _SECTION_MARKERS:
+        # Find section start
+        start_mask = df.apply(
+            lambda row: row.astype(str)
+            .str.contains(rf"\b{re.escape(start_label)}\b", case=False, regex=True)
+            .any(),
+            axis=1,
+        )
+        start_indices = [idx for idx, flag in start_mask.items() if flag]
+        if not start_indices:
+            log.warning(
+                "Charges postal – '%s' section not found in %s; skipping.",
+                start_label,
+                file_name,
+            )
+            continue
 
-    total_income_mask = df.apply(
-        lambda row: row.astype(str)
-        .str.contains("Total INCOME", case=False)
-        .any(),
-        axis=1,
-    )
-    total_indices = [idx for idx, flag in total_income_mask.items() if flag and idx >= start_idx]
-    if not total_indices:
-        log.error("Charges postal – 'Total INCOME' not found in %s.", file_name)
-        return None
-    stop_idx = total_indices[0]
+        start_idx = start_indices[0]
 
-    return df.iloc[start_idx : stop_idx + 1].copy()
+        # Find section terminator
+        stop_mask = df.apply(
+            lambda row: row.astype(str)
+            .str.contains(stop_label, case=False)
+            .any(),
+            axis=1,
+        )
+        stop_indices = [idx for idx, flag in stop_mask.items() if flag and idx >= start_idx]
+        if not stop_indices:
+            log.warning(
+                "Charges postal – '%s' terminator not found after '%s' in %s; skipping section.",
+                stop_label,
+                start_label,
+                file_name,
+            )
+            continue
+
+        stop_idx = stop_indices[0]
+        blocks.append(df.iloc[start_idx : stop_idx + 1].copy())
+
+    return blocks
 
 
 def _locate_header(work: pd.DataFrame, file_name: str) -> tuple[int, int, int] | None:
@@ -79,6 +98,7 @@ def _locate_header(work: pd.DataFrame, file_name: str) -> tuple[int, int, int] |
 
     header_row_idx: int | None = None
     header_row = None
+
     for idx in work.index:
         row = work.loc[idx].astype(str)
         if any(cell.strip() == "Charge Type" for cell in row) and any(
@@ -97,6 +117,7 @@ def _locate_header(work: pd.DataFrame, file_name: str) -> tuple[int, int, int] |
 
     charge_col: int | None = None
     value_col: int | None = None
+
     for col_idx, cell in header_row.items():
         text = str(cell).strip()
         if text == "Charge Type":
@@ -115,7 +136,7 @@ def _locate_header(work: pd.DataFrame, file_name: str) -> tuple[int, int, int] |
 
 
 def extract_postal_rows(path: Path) -> list[dict[str, str]]:
-    """Collect Postal Charge rows from the Charges Excel INCOME block."""
+    """Collect Postal Charge rows from the Charges Excel INCOME/NON INCOME blocks."""
 
     try:
         df = pd.read_excel(path, header=None, dtype=str, engine="xlrd")
@@ -123,36 +144,35 @@ def extract_postal_rows(path: Path) -> list[dict[str, str]]:
         log.error("Charges postal – failed to read %s: %s", path.name, exc)
         return []
 
-    block = _get_income_block(df, path.name)
-    if block is None:
-        return []
-
-    header_info = _locate_header(block, path.name)
-    if header_info is None:
-        return []
-
-    header_row_idx, charge_col, value_col = header_info
-
+    blocks = _get_section_blocks(df, path.name)
     results: list[dict[str, str]] = []
-    for idx in block.index:
-        if idx <= header_row_idx:
+
+    for block in blocks:
+        header_info = _locate_header(block, path.name)
+        if header_info is None:
             continue
 
-        charge_text = str(block.at[idx, charge_col]).strip()
-        if POSTAL_LABEL.lower() not in charge_text.lower():
-            continue
+        header_row_idx, charge_col, value_col = header_info
 
-        value_text = str(block.at[idx, value_col]).strip()
-        if not value_text:
-            continue
+        for idx in block.index:
+            if idx <= header_row_idx:
+                continue
 
-        results.append(
-            {
-                "charge_type": charge_text,
-                "value": value_text,
-                "row_index": str(idx),
-            }
-        )
+            charge_text = str(block.at[idx, charge_col]).strip()
+            if POSTAL_LABEL.lower() not in charge_text.lower():
+                continue
+
+            value_text = str(block.at[idx, value_col]).strip()
+            if not value_text:
+                continue
+
+            results.append(
+                {
+                    "charge_type": charge_text,
+                    "value": value_text,
+                    "row_index": str(idx),
+                }
+            )
 
     return results
 
@@ -178,7 +198,11 @@ def write_postal_detail_excel(path: Path, output_dir: Path) -> bool:
     ]
 
     data_rows.append(
-        {"date": date_str, "Charge Type": "Total Charges Postal", "Value": f"{total:.2f}"}
+        {
+            "date": date_str,
+            "Charge Type": "Total Charges Postal",
+            "Value": f"{total:.2f}",
+        }
     )
 
     df_out = pd.DataFrame(data_rows, columns=["date", "Charge Type", "Value"])

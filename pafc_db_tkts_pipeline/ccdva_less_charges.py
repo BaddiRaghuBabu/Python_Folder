@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 """Derive CCDVA less charges column for Klarna Season/Event exports."""
 
 from pathlib import Path
@@ -14,8 +13,10 @@ from .logger import log
 def _to_numeric(series: pd.Series) -> pd.Series:
     """Return numeric series with NaNs coerced to 0 for arithmetic."""
 
-    return pd.to_numeric(series, errors="coerce").fillna(0)
-
+    cleaned = series.replace(r"\s+", "", regex=True)
+    cleaned = cleaned.replace(r"^\((.+)\)$", r"-\1", regex=True)
+    cleaned = cleaned.replace(",", "", regex=False)
+    return pd.to_numeric(cleaned, errors="coerce").fillna(0)
 
 def _apply_ccdva_less_charges(df: pd.DataFrame) -> pd.DataFrame:
     """Add ccdva_less_charges column and populate total row."""
@@ -92,6 +93,7 @@ def add_ccdva_less_charges_column(pdf_paths: Iterable[Path]) -> bool:
             success = False
 
     return success
+
 
 
 __all__ = ["add_ccdva_less_charges_column"]

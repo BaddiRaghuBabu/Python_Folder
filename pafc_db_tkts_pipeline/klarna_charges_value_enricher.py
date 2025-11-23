@@ -173,7 +173,7 @@ def _normalize_label(label: str) -> str:
 
     cleaned = re.sub(r"\btotal\b", "", cleaned)
     cleaned = re.sub(r"\btravel\b", "", cleaned)
-    cleaned = re.sub(r"\b\d{1,2}/\d{1,2}/\d{2,4}\b", "", cleaned)
+    cleaned = re.sub(r"\b\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}\b", "", cleaned)
     cleaned = re.sub(r"[^a-z0-9]+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
 

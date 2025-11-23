@@ -57,6 +57,7 @@ def extract_totals_from_file(path: Path) -> list[dict[str, object]]:
 
     rows: list[dict[str, object]] = []
     inside_income = False
+    inside_non_income = False
     date_str = _extract_date_from_filename(path.name)
     seen_totals: set[str] = set()
     for _, row in df.iterrows():
@@ -72,16 +73,21 @@ def extract_totals_from_file(path: Path) -> list[dict[str, object]]:
 
         if any(text == "INCOME" for text in texts):
             inside_income = True
+            inside_non_income = False
             continue
 
-        if any(text == "Method of Payment" for text in texts) or any(
-            text == "NON INCOME" for text in texts
-        ):
+        if any(text == "NON INCOME" for text in texts):
+
             inside_income = False
+            inside_non_income = True
             continue
 
-        if not inside_income:
+        if any(text == "Method of Payment" for text in texts):
+            inside_income = False
+            inside_non_income = False
             continue
+
+        if not inside_income and not inside_non_income:            continue
 
         total_name = next((text for text in texts if text.startswith(TOTAL_PREFIX)), None)
         if not total_name:
@@ -109,6 +115,8 @@ def extract_totals_from_file(path: Path) -> list[dict[str, object]]:
                 "file": path.name,
                 "total_name": total_name,
                 "value": value,
+                "category": "NON INCOME" if inside_non_income else "INCOME",
+
             }
         )
 
@@ -122,7 +130,7 @@ def _write_per_file_summary(rows: list[dict[str, object]], output_dir: Path) -> 
         return
 
     output_dir.mkdir(parents=True, exist_ok=True)
-    df = pd.DataFrame(rows, columns=["date", "total_name", "value"])
+    df = pd.DataFrame(rows, columns=["date", "total_name", "value", "category"])
     date_str = rows[0]["date"] or "unknown"
     out_path = output_dir / f"charges_value_{date_str}.xlsx"
     df.to_excel(out_path, index=False)
@@ -151,8 +159,10 @@ def write_charges_totals_excels(paths: Iterable[Path]) -> tuple[int, list[str]]:
 
     if all_rows:
         CHARGES_TOTALS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-        combined = pd.DataFrame(all_rows, columns=["date", "total_name", "value"])
-        combined.sort_values(["date", "total_name"], inplace=True)
+        combined = pd.DataFrame(
+            all_rows, columns=["date", "total_name", "value", "category"]
+        )
+        combined.sort_values(["date", "total_name", "category"], inplace=True)
         out_path = CHARGES_TOTALS_OUTPUT_DIR / "charges_totals_all_dates.xlsx"
         combined.to_excel(out_path, index=False)
         log.info(
