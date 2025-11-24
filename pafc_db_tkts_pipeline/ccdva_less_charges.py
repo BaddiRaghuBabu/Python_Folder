@@ -22,8 +22,10 @@ def _apply_ccdva_less_charges(df: pd.DataFrame) -> pd.DataFrame:
     """Add ccdva_less_charges column and populate total row."""
 
     working_df = df.copy()
-    working_df["ccdva_less_charges"] = (
-        _to_numeric(working_df["Total_CCDVA"]) - _to_numeric(working_df["charges_value"])
+    total_ccdva = _to_numeric(working_df["Total_CCDVA"])
+    charges_value = _to_numeric(working_df["charges_value"])
+    working_df["ccdva_less_charges"] = total_ccdva.where(
+        total_ccdva == 0, total_ccdva - charges_value
     )
 
     total_mask = working_df.get("Event", pd.Series(dtype=str)).astype(str).str.casefold() == "total income"

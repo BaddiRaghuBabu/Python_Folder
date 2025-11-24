@@ -18,14 +18,29 @@ def _normalise_amount(raw: str) -> str:
     """
     Normalise a numeric string such as '(2,659.00)' to '2659.00'.
     """
-    cleaned = raw.replace("(", "").replace(")", "").replace("-", "").replace(",", "")
-    cleaned = cleaned.strip()
-    try:
-        value = float(cleaned)
-        return f"{value:.2f}"
-    except ValueError:
-        return cleaned
+    s = raw.strip()
 
+    negative = False
+    if s.startswith("(") and s.endswith(")"):
+        negative = True
+        s = s[1:-1]
+
+    if s.startswith("-"):
+        negative = True
+        s = s[1:]
+
+    s = s.replace(",", "")
+
+    try:
+        value = float(s)
+
+    except ValueError:
+        return raw.strip()
+
+    if negative:
+        value = -value
+
+    return f"{value:.2f}"
 
 def _find_first_amount(line: str) -> str | None:
     m = _AMOUNT_RE.search(line)

@@ -11,7 +11,34 @@ from .logger import log  # only used for ERROR-level logging
 #   78.00
 #   1,251.00
 #   (75.00)
-_MONEY_RE = re.compile(r"\(?\d[\d,]*\.\d{2}\)?")
+#   -12.34
+_MONEY_RE = re.compile(r"\(?-?\d[\d,]*\.\d{2}\)?")
+
+
+def _normalise_amount(raw: str) -> str:
+    """Convert a PDF money string to a standard '1234.56' or '-1234.56'."""
+    s = raw.strip()
+
+    negative = False
+    if s.startswith("(") and s.endswith(")"):
+        negative = True
+        s = s[1:-1]
+
+    if s.startswith("-"):
+        negative = True
+        s = s[1:]
+
+    s = s.replace(",", "")
+
+    try:
+        value = float(s)
+    except ValueError:
+        return raw.strip()
+
+    if negative:
+        value = -value
+
+    return f"{value:.2f}"
 
 
 def _words_to_lines(words, y_tolerance: float = 2.0) -> list[list[dict]]:
@@ -138,7 +165,7 @@ def extract_membership_other_and_total(
             if not amounts:
                 continue
 
-            value = amounts[-1]
+            value = _normalise_amount(amounts[-1])
 
             if is_other and other_val is None:
                 other_val = value

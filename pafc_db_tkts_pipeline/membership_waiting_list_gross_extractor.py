@@ -23,6 +23,10 @@ def _normalise_number(raw: str) -> str:
     negative = s.startswith("(") and s.endswith(")")
     s = s.strip("()").replace(",", "")
 
+    if s.startswith("-"):
+        negative = True
+        s = s[1:]
+
     if not s:
         log.error("Waiting List gross – blank numeric value after cleaning %r", raw)
         return "Data Unavailable"
@@ -60,7 +64,7 @@ def extract_mddto_waiting_list_gross(pdf_path: Path | str) -> str:
     target_group = "Waiting List"
     target_label = "Gross Value (Inc Charges)"
 
-    pattern = re.compile(r"Gross Value \(Inc Charges\)\s+([(\d][0-9.,()]+)")
+    pattern = re.compile(r"Gross Value \(Inc Charges\)\s+([-()(\d][0-9.,()-]*)")
 
     try:
         with pdfplumber.open(pdf_path) as pdf:

@@ -221,6 +221,8 @@ def _match_event_to_total(
       and the total has not already been used.
     - Otherwise we try a prefix-lexical match for truncated names
       (e.g. 'Sausage and Cider Fe' -> 'Sausage and Cider Festival with The Wurzles').
+      This is now relaxed so that short three-token events like
+      "Tottenham Hotspur U2" can match "Total Tottenham Hotspur U21".
     - Otherwise we fall back to embedding similarity, but restrict to:
         * same coach/non-coach type
         * not previously used
@@ -236,7 +238,7 @@ def _match_event_to_total(
             return idx, 1.0
         # If type doesn't match or already used -> ignore and move on
 
-    # 1b) Prefix-based lexical match for truncated event names
+    # 1b) Prefix-based lexical match for truncated or slightly different names
     tokens_event = normalized_event.split()
     best_prefix_idx: int | None = None
     best_prefix_len = 0
@@ -254,11 +256,19 @@ def _match_event_to_total(
 
             common_prefix_len = _common_prefix_len(tokens_event, tokens_total)
 
+            # For longer events we still want at least 3-token prefixes.
+            # For 3-token events (like "tottenham hotspur u2") we allow 2-token
+            # prefixes (club name + nickname) and ignore the last token
+            # (e.g. u2 vs u21).
+            min_prefix_tokens = 3 if len(tokens_event) > 3 else 2
+
             # Conditions:
-            # - at least 3 tokens in common prefix
+            # - at least `min_prefix_tokens` tokens in common prefix
             # - that prefix covers all but at most one event token
-            #   (handles 'fe' vs 'festival', 'ba' vs 'band', etc.)
-            if common_prefix_len >= 3 and common_prefix_len >= len(tokens_event) - 1:
+            if (
+                common_prefix_len >= min_prefix_tokens
+                and common_prefix_len >= len(tokens_event) - 1
+            ):
                 # prefer the longest prefix match
                 if common_prefix_len > best_prefix_len:
                     best_prefix_len = common_prefix_len
@@ -267,6 +277,28 @@ def _match_event_to_total(
         if best_prefix_idx is not None:
             # Treat this as a high-confidence lexical match
             return best_prefix_idx, 0.95
+
+    # 1c) Shorter prefix match (for concise event names)
+    if len(tokens_event) >= 2:
+        for idx, total_name in enumerate(total_names):
+            if idx in used_indices:
+                continue
+            if total_is_coach[idx] != event_is_coach:
+                continue
+
+            tokens_total = _normalize_label(total_name).split()
+            if len(tokens_total) < len(tokens_event):
+                continue
+
+            if tokens_total[: len(tokens_event)] == tokens_event:
+                # Prefer the shortest suffix difference to keep the closest match
+                suffix_len = len(tokens_total) - len(tokens_event)
+                if best_prefix_idx is None or suffix_len < best_prefix_len:
+                    best_prefix_idx = idx
+                    best_prefix_len = suffix_len
+
+        if best_prefix_idx is not None:
+            return best_prefix_idx, 0.9
 
     # 2) Embedding-based match with filters
     event_embedding = _embed_texts(client, [event])[0]

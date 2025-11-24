@@ -7,8 +7,34 @@ import pdfplumber
 
 from .logger import log
 
-# Money like 25.00 or 2,418.00
-_MONEY_RE = re.compile(r"\d[\d,]*\.\d{2}")
+# Money like 25.00, 2,418.00, (15.00) or -15.00
+_MONEY_RE = re.compile(r"\(?-?\d[\d,]*\.\d{2}\)?")
+
+
+def _normalise_amount(raw: str) -> str:
+    """Convert a PDF money string to a standard '1234.56' or '-1234.56'."""
+    s = raw.strip()
+
+    negative = False
+    if s.startswith("(") and s.endswith(")"):
+        negative = True
+        s = s[1:-1]
+
+    if s.startswith("-"):
+        negative = True
+        s = s[1:]
+
+    s = s.replace(",", "")
+
+    try:
+        value = float(s)
+    except ValueError:
+        return raw.strip()
+
+    if negative:
+        value = -value
+
+    return f"{value:.2f}"
 
 
 def extract_mddto_miles_gross(pdf_path: Path) -> str:
@@ -76,7 +102,7 @@ def extract_mddto_miles_gross(pdf_path: Path) -> str:
                 for j in range(gross_idx, min(gross_idx + 4, len(lines))):
                     m = _MONEY_RE.search(lines[j])
                     if m:
-                        amount = m.group(0)
+                        amount = _normalise_amount(m.group(0))
                         return amount
 
                 log.debug(
