@@ -47,7 +47,7 @@ def _load_charges_totals(date_str: str) -> pd.DataFrame | None:
         return None
 
     try:
-        df = pd.read_excel(charges_path, dtype={"total_name": str})
+        df = pd.read_excel(charges_path, dtype={"total_name": str, "category": str})
     except Exception as exc:  # noqa: BLE001
         log.error(
             "Charges/Klarna enrichment – failed to read %s: %s",
@@ -366,6 +366,7 @@ def _enrich_csv(
     used_indices: set[int] = set()
 
     event_matches: list[float | str] = []
+    event_categories: list[str] = []
 
     for event in df["Event"].astype(str):
         event_clean = event.strip()
@@ -373,6 +374,8 @@ def _enrich_csv(
         # Skip blanks and the summary row
         if not event_clean or event_clean.casefold() == "total income":
             event_matches.append("")
+            event_categories.append("")
+
             continue
 
         match = _match_event_to_total(
@@ -387,15 +390,23 @@ def _enrich_csv(
         if match is None:
             # No suitable total_name (or below similarity threshold)
             event_matches.append(0)
+            event_categories.append("")
+
             continue
 
         matched_index, _score = match
         used_indices.add(matched_index)
 
-        value = charges_df.iloc[matched_index]["value"]
+        matched_row = charges_df.iloc[matched_index]
+        value = matched_row["value"]
+        category = matched_row.get("category", "")
         event_matches.append(value)
+        event_categories.append(str(category).strip() if pd.notna(category) else "")
+
 
     df["charges_value"] = event_matches
+    df["charges_category"] = event_categories
+
 
     try:
         df.to_csv(csv_file, index=False)
