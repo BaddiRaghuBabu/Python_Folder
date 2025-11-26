@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pandas as pd
 
-from .config import TICKETOFFICE_SALE_COMBINED_CSV, XERO_TKTS_OUTPUT_BASE_DIR
+from .config import (
+    KLARNA_SEMOP_TABLE_OUTPUT_DIR,
+    TICKETOFFICE_SALE_COMBINED_CSV,
+    XERO_TKTS_OUTPUT_BASE_DIR,
+) 
 from .logger import log
 
 
@@ -19,6 +23,18 @@ _REQUIRED_COLUMNS = {
     "mddto_miles_gross",
 }
 
+_EVENT_COLUMN = "Event"
+_CCDVA_LESS_CHARGES_COLUMN = "ccdva_less_charges"
+
+
+def _clean_value(raw_value: object) -> str | None:
+    """Return cleaned string value, or ``None`` if empty/invalid."""
+
+    text = str(raw_value).strip()
+    if not text or text.lower() in {"nan", "none"}:
+        return None
+
+    return text
 
 def _format_date(value: str) -> str:
     """Ensure dates are 8-digit strings (YYYYMMDD)."""
@@ -46,6 +62,70 @@ def _build_rows(date: str, values: dict[str, str]) -> list[dict[str, str]]:
         {"Date": date, "Heading": "GIFT CARD", "Value": zero_value},
         {"Date": date, "Heading": "VOUCHER", "Value": zero_value},
     ]
+
+def _build_event_ccdva_rows(date: str) -> list[dict[str, str]]:
+    """Return CCDVA less charges rows derived from Season/Event CSV exports."""
+
+    rows: list[dict[str, str]] = []
+
+    csv_matches = sorted(KLARNA_SEMOP_TABLE_OUTPUT_DIR.glob(f"*{date}*.csv"))
+    if not csv_matches:
+        log.warning(
+            "Xero TKTS output – no Season/Event CSV found for date %s; skipping CCDVA rows.",
+            date,
+        )
+        return rows
+
+    csv_path = csv_matches[0]
+    try:
+        df = pd.read_csv(csv_path, dtype=str)
+    except Exception as exc:  # noqa: BLE001
+        log.error(
+            "Xero TKTS output – failed to read %s for date %s: %s.",
+            csv_path.name,
+            date,
+            exc,
+        )
+        return rows
+
+    required_cols = {_EVENT_COLUMN, _CCDVA_LESS_CHARGES_COLUMN}
+    if not required_cols.issubset(df.columns):
+        log.warning(
+            "Xero TKTS output – %s missing required columns %s; skipping CCDVA rows for %s.",
+            csv_path.name,
+            sorted(required_cols),
+            date,
+        )
+        return rows
+
+    skip_events = {"total income", "xero_ccdva_less_charges-->"}
+    for _, event_row in df.iterrows():
+        event_name = _clean_value(event_row[_EVENT_COLUMN])
+        if not event_name or event_name.casefold() in skip_events:
+            continue
+
+        value = _clean_value(event_row[_CCDVA_LESS_CHARGES_COLUMN])
+        if value is None:
+            continue
+
+        rows.append(
+            {
+                "Date": date,
+                "Heading": f"{event_name} /ccdva_less_charges",
+                "Value": value,
+            }
+        )
+
+    if not rows:
+        log.info(
+            "Xero TKTS output – no CCDVA rows emitted for %s from %s.",
+            date,
+            csv_path.name,
+        )
+
+    return rows
+
+
 
 
 def build_xero_ticket_outputs() -> None:
@@ -87,7 +167,7 @@ def build_xero_ticket_outputs() -> None:
         date_folder = XERO_TKTS_OUTPUT_BASE_DIR / f"output_xero_tkts_{date}"
         date_folder.mkdir(parents=True, exist_ok=True)
 
-        out_path: Path =  f"output_xero_tkts_{date}.csv"
+        out_path: Path = date_folder / f"output_xero_tkts_{date}.csv"
         values: dict[str, str] = {}
         for col in _REQUIRED_COLUMNS:
             if col == "date":
@@ -97,6 +177,7 @@ def build_xero_ticket_outputs() -> None:
             values[col] = "0" if raw_value.lower() in {"", "nan", "none"} else raw_value
 
         rows = _build_rows(date, values)
+        rows.extend(_build_event_ccdva_rows(date))
         pd.DataFrame(rows, columns=["Date", "Heading", "Value"]).to_csv(
             out_path, index=False, encoding="utf-8-sig"
         )
@@ -106,6 +187,7 @@ def build_xero_ticket_outputs() -> None:
             out_path,
             len(rows),
         )
+
 
 
 __all__ = ["build_xero_ticket_outputs"]
