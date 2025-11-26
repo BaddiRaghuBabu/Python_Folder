@@ -58,6 +58,7 @@ from pafc_db_tkts_pipeline.output_aggregate_builder import (
     build_status_expected_and_actual_total_column,# 24th column
     
 )
+from pafc_db_tkts_pipeline.xero_tkts_output_builder import build_xero_ticket_outputs
 
 from pafc_db_tkts_pipeline.charges_total_name_seanson_Event_name_ import (
     generate_charges_total_name_season_event_report,
@@ -93,7 +94,7 @@ def main() -> None:
     build_actual_total_column()
     build_expected_total_column()
     build_status_expected_and_actual_total_column()
-    
+    build_xero_ticket_outputs()
 
     # Final summary
     log.info(

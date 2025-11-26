@@ -32,6 +32,8 @@ MEMBERSHIP_INPUT_DIR = INPUT_ROOT / "membershipdailydetailedtotalonly_YYYYMMDD"
 # ---- Outputs ---------------------------------------------------------------
 
 OUTPUT_DIR = TKTS_ROOT / "outputs"
+# Base folder for Xero TKTS exports (each date gets its own subfolder)
+XERO_TKTS_OUTPUT_BASE_DIR = OUTPUT_DIR / "output_xero_tkts"
 
 SALEITEMSMOP_EXCEL = OUTPUT_DIR / "saleitemsmop_summary.xlsx"
 TICKETOFFICE_CSV = OUTPUT_DIR / "ticketoffice_dailybanking_notes.csv"
