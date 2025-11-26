@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import re
+
 from .config import (
     KLARNA_SEMOP_TABLE_OUTPUT_DIR,
     TICKETOFFICE_SALE_COMBINED_CSV,
@@ -22,13 +22,6 @@ _REQUIRED_COLUMNS = {
     "xero_evergreen",
     "mddto_miles_gross",
 }
-
-_RECONCILIATION_COLUMNS = {
-    "actual_total",
-    "expected_total",
-    "ticketoffice_notes",
-}
-
 
 _EVENT_COLUMN = "Event"
 _CCDVA_LESS_CHARGES_COLUMN = "ccdva_less_charges"
@@ -47,31 +40,6 @@ def _format_date(value: str) -> str:
     """Ensure dates are 8-digit strings (YYYYMMDD)."""
 
     return str(value).strip().zfill(8)
-
-def _parse_number(raw_value: object) -> float:
-    """Convert numeric strings to floats, treating placeholders as zero."""
-
-    text = str(raw_value).strip()
-    lower = text.lower()
-    if (
-        not text
-        or lower in {"nan", "none", "null"}
-        or "unavailable" in lower
-        or "not available" in lower
-    ):
-        return 0.0
-
-    cleaned = text.replace(",", "")
-    cleaned = re.sub(r"\(([^)]+)\)", r"-\1", cleaned)
-
-    try:
-        return float(cleaned)
-    except ValueError:
-        return 0.0
-
-
-def _format_number(value: float) -> str:
-    return f"{value:.2f}"
 
 
 def _build_rows(date: str, values: dict[str, str]) -> list[dict[str, str]]:
@@ -97,38 +65,6 @@ def _build_rows(date: str, values: dict[str, str]) -> list[dict[str, str]]:
 
 def _build_event_ccdva_rows(date: str) -> list[dict[str, str]]:
     """Return CCDVA less charges rows derived from Season/Event CSV exports."""
-
-def _build_reconciliation_rows(
-    date: str,
-    actual_total: object,
-    expected_total: object,
-    ticketoffice_notes: object,
-) -> list[dict[str, str]]:
-    """Return reconciliation rows derived from actual/expected totals and notes."""
-
-    actual_numeric = _parse_number(actual_total)
-    expected_numeric = _parse_number(expected_total)
-    difference_numeric = expected_numeric - actual_numeric
-
-    actual_value = _clean_value(actual_total) or _format_number(actual_numeric)
-    expected_value = _clean_value(expected_total) or _format_number(expected_numeric)
-    difference_value = _format_number(difference_numeric)
-
-    status = "Matched" if round(difference_numeric, 2) == 0 else "Not Matched"
-    notes_value = _clean_value(ticketoffice_notes) or ""
-
-    return [
-        {
-            "Date": date,
-            "Heading": ">>>>>>>>>>>>>>>>>>Reconciliation Notes>>>>>>>>>>>>>>>>",
-            "Value": "",
-        },
-        {"Date": date, "Heading": "Actual Total", "Value": actual_value},
-        {"Date": date, "Heading": "Expected Total", "Value": expected_value},
-        {"Date": date, "Heading": "Difference", "Value": difference_value},
-        {"Date": date, "Heading": "Reconciliation Status", "Value": status},
-        {"Date": date, "Heading": "Ticket Office Notes", "Value": notes_value},
-    ]
 
     rows: list[dict[str, str]] = []
 
@@ -204,8 +140,7 @@ def build_xero_ticket_outputs() -> None:
         )
         return
 
-    required_columns = _REQUIRED_COLUMNS.union(_RECONCILIATION_COLUMNS)
-    missing = required_columns.difference(base_df.columns)
+    missing = _REQUIRED_COLUMNS.difference(base_df.columns)
     if missing:
         log.error(
             "Xero TKTS output – base file %s missing required columns %s.",
@@ -232,7 +167,7 @@ def build_xero_ticket_outputs() -> None:
         date_folder = XERO_TKTS_OUTPUT_BASE_DIR / f"output_xero_tkts_{date}"
         date_folder.mkdir(parents=True, exist_ok=True)
 
-        out_path: Path = date_folder / f"output_xero_tkts_{date}.csv"
+        out_path: Path = f"output_xero_tkts_{date}.csv"
         values: dict[str, str] = {}
         for col in _REQUIRED_COLUMNS:
             if col == "date":
@@ -246,20 +181,12 @@ def build_xero_ticket_outputs() -> None:
         pd.DataFrame(rows, columns=["Date", "Heading", "Value"]).to_csv(
             out_path, index=False, encoding="utf-8-sig"
         )
-        rows.extend(
-            _build_reconciliation_rows(
-                date,
-                row["actual_total"],
-                row["expected_total"],
-                row["ticketoffice_notes"],
-            )
-        )
+
         log.info(
             "Xero TKTS output – created %s with %d row(s).",
             out_path,
             len(rows),
         )
-
 
 
 __all__ = ["build_xero_ticket_outputs"]
