@@ -111,7 +111,7 @@ def _build_event_ccdva_rows(date: str) -> list[dict[str, str]]:
         rows.append(
             {
                 "Date": date,
-                "Heading": f"{event_name} /ccdva_less_charges",
+                "Heading": f"{event_name}",
                 "Value": value,
             }
         )
@@ -167,7 +167,7 @@ def build_xero_ticket_outputs() -> None:
         date_folder = XERO_TKTS_OUTPUT_BASE_DIR / f"output_xero_tkts_{date}"
         date_folder.mkdir(parents=True, exist_ok=True)
 
-        out_path: Path = f"output_xero_tkts_{date}.csv"
+        out_path: Path = date_folder / f"output_xero_tkts_{date}.csv"
         values: dict[str, str] = {}
         for col in _REQUIRED_COLUMNS:
             if col == "date":
@@ -179,7 +179,7 @@ def build_xero_ticket_outputs() -> None:
         rows = _build_rows(date, values)
         rows.extend(_build_event_ccdva_rows(date))
         pd.DataFrame(rows, columns=["Date", "Heading", "Value"]).to_csv(
-            out_path, index=False, encoding="utf-8-sig"
+            out_path, index=False
         )
 
         log.info(
